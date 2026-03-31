@@ -1,2 +1,8 @@
-// Service abstractions — populated in later phases
-// (Ollama, arduino-cli, serial, external APIs)
+pub mod provider;
+pub mod ollama;
+pub mod openai;
+pub mod anthropic;
+pub mod google;
+pub mod mistral;
+pub mod model_manager;
+pub mod keystore;

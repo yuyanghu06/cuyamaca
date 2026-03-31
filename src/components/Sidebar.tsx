@@ -1,4 +1,9 @@
+import { useState, useEffect, useCallback } from "react";
 import StatusDot from "./StatusDot";
+import {
+  checkOllamaHealth,
+  checkModelHealth,
+} from "../commands/models";
 
 type NavView = "manifest" | "code" | "chat";
 
@@ -7,20 +12,62 @@ interface SidebarProps {
   onNavigate: (view: NavView) => void;
 }
 
+type HealthStatus = "green" | "amber" | "red";
+
 const navItems: { id: NavView; label: string; icon: string }[] = [
   { id: "manifest", label: "Manifest", icon: "⚙" },
   { id: "code", label: "Code", icon: "⟨⟩" },
   { id: "chat", label: "Chat", icon: "◉" },
 ];
 
-const healthItems = [
-  { label: "Ollama", status: "red" as const },
-  { label: "arduino-cli", status: "red" as const },
-  { label: "Code Model", status: "red" as const },
-  { label: "Runtime Model", status: "red" as const },
-];
-
 export default function Sidebar({ activeView, onNavigate }: SidebarProps) {
+  const [ollamaStatus, setOllamaStatus] = useState<HealthStatus>("red");
+  const [codeModelStatus, setCodeModelStatus] = useState<HealthStatus>("red");
+  const [runtimeModelStatus, setRuntimeModelStatus] = useState<HealthStatus>("red");
+
+  const pollHealth = useCallback(async () => {
+    try {
+      const ollamaOk = await checkOllamaHealth();
+      setOllamaStatus(ollamaOk ? "green" : "red");
+    } catch {
+      setOllamaStatus("red");
+    }
+
+    try {
+      const codeOk = await checkModelHealth("code");
+      setCodeModelStatus(codeOk ? "green" : "red");
+    } catch {
+      setCodeModelStatus("red");
+    }
+
+    try {
+      const runtimeOk = await checkModelHealth("runtime");
+      setRuntimeModelStatus(runtimeOk ? "green" : "red");
+    } catch {
+      setRuntimeModelStatus("red");
+    }
+  }, []);
+
+  useEffect(() => {
+    pollHealth();
+    const interval = setInterval(pollHealth, 30_000);
+
+    const onFocus = () => pollHealth();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [pollHealth]);
+
+  const healthItems: { label: string; status: HealthStatus }[] = [
+    { label: "Ollama", status: ollamaStatus },
+    { label: "arduino-cli", status: "red" },
+    { label: "Code Model", status: codeModelStatus },
+    { label: "Runtime Model", status: runtimeModelStatus },
+  ];
+
   return (
     <aside className="sidebar glass-subtle">
       <div className="sidebar-header">

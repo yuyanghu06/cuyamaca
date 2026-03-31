@@ -12,3 +12,6 @@ pub mod serial;
 pub mod sensor_state;
 pub mod sensor_viz;
 pub mod camera;
+pub mod context;
+pub mod tool_dispatch;
+pub mod agent;

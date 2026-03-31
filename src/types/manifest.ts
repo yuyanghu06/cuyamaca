@@ -108,3 +108,13 @@ export interface SensorStateSnapshot {
   sensors: SensorSnapshot[];
   formatted_text: string;
 }
+
+// ── Runtime Agent types ──
+
+export type AgentEvent =
+  | { event: "modelResponse"; data: string }
+  | { event: "toolCallStarted"; data: { tool_name: string; arguments: Record<string, unknown> } }
+  | { event: "toolCallCompleted"; data: { tool_name: string; success: boolean; output: string } }
+  | { event: "turnComplete" }
+  | { event: "sessionEnded" }
+  | { event: "error"; data: string };

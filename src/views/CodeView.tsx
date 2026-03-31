@@ -6,6 +6,7 @@ import {
   rejectSketch,
 } from "../commands/codegen";
 import { flashSketch } from "../commands/flash";
+import { openRuntimeWindow } from "../commands/runtime";
 import type {
   Project,
   GeneratedSketchResponse,
@@ -200,7 +201,6 @@ export default function CodeView({
               binarySize: event.data.binary_size,
               maxSize: event.data.max_size,
             });
-            setTimeout(() => setFlashStatus({ state: "idle" }), 4000);
             break;
           case "failed":
             setFlashStatus({ state: "failed", error: event.data.error });
@@ -251,7 +251,6 @@ export default function CodeView({
               binarySize: event.data.binary_size,
               maxSize: event.data.max_size,
             });
-            setTimeout(() => setFlashStatus({ state: "idle" }), 4000);
             break;
           case "failed":
             setFlashStatus({ state: "failed", error: event.data.error });
@@ -373,6 +372,27 @@ export default function CodeView({
                       ` (${Math.round((flashStatus.binarySize / flashStatus.maxSize) * 100)}% of ${flashStatus.maxSize})`}
                   </div>
                 )}
+                <div className="flash-actions">
+                  <button
+                    className="code-generate-btn runtime-start-btn"
+                    onClick={async () => {
+                      try {
+                        await openRuntimeWindow();
+                      } catch (err) {
+                        setError(String(err));
+                      }
+                      setFlashStatus({ state: "idle" });
+                    }}
+                  >
+                    ▶ Start Runtime
+                  </button>
+                  <button
+                    className="code-upload-btn"
+                    onClick={() => setFlashStatus({ state: "idle" })}
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </>
             )}
             {flashStatus.state === "failed" && (

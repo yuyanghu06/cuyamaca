@@ -3,3 +3,4 @@ pub mod models;
 pub mod projects;
 pub mod codegen;
 pub mod flash;
+pub mod serial;

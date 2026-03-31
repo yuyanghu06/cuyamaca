@@ -26,4 +26,5 @@ keyring = "3"
 serialport = "4"
 dirs = "6"
 similar = "2"
+image = "0.25"
 

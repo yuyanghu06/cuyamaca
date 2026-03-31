@@ -5,12 +5,14 @@ mod services;
 use models::project::Project;
 use services::arduino::ArduinoService;
 use services::model_manager::ModelManager;
+use services::serial::SerialConnection;
 use std::sync::Mutex;
 
 pub struct AppState {
     pub model_manager: ModelManager,
     pub active_project: Mutex<Option<Project>>,
     pub arduino: ArduinoService,
+    pub serial: Mutex<Option<SerialConnection>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,6 +21,7 @@ pub fn run() {
         model_manager: ModelManager::new(),
         active_project: Mutex::new(None),
         arduino: ArduinoService::new(),
+        serial: Mutex::new(None),
     };
 
     tauri::Builder::default()
@@ -60,6 +63,12 @@ pub fn run() {
             commands::flash::install_arduino_cli,
             commands::flash::detect_boards,
             commands::flash::flash_sketch,
+            commands::serial::open_serial,
+            commands::serial::close_serial,
+            commands::serial::send_serial_command,
+            commands::serial::get_sensor_state,
+            commands::serial::get_sensor_viz,
+            commands::serial::subscribe_serial,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

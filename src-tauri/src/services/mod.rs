@@ -8,3 +8,7 @@ pub mod model_manager;
 pub mod keystore;
 pub mod code_gen;
 pub mod arduino;
+pub mod serial;
+pub mod sensor_state;
+pub mod sensor_viz;
+pub mod camera;

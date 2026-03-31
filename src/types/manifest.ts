@@ -87,3 +87,24 @@ export type FlashEvent =
   | { event: "uploading" }
   | { event: "succeeded"; data: { binary_size: number; max_size: number } }
   | { event: "failed"; data: { error: string } };
+
+// ── Serial / Sensor types ──
+
+export type SerialEvent =
+  | { event: "rawLine"; data: string }
+  | { event: "sensorUpdate"; data: { sensor_id: string; values: number[]; formatted: string } }
+  | { event: "disconnected"; data: { error: string } };
+
+export interface SensorSnapshot {
+  sensor_id: string;
+  label: string;
+  component_type: string;
+  values: number[];
+  formatted: string;
+  timestamp_ms: number;
+}
+
+export interface SensorStateSnapshot {
+  sensors: SensorSnapshot[];
+  formatted_text: string;
+}

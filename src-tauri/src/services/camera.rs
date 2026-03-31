@@ -1,10 +1,12 @@
 use crate::models::manifest::Component;
 
+#[allow(dead_code)]
 pub struct CameraService {
     snapshot_url: String,
     client: reqwest::Client,
 }
 
+#[allow(dead_code)]
 impl CameraService {
     /// Create a CameraService from a camera component's manifest entry.
     /// Returns None if the component is not a WiFi camera.

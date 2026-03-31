@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::ipc::Channel;
 
+#[allow(dead_code)]
 const MAX_TOOL_ITERATIONS: usize = 10;
 
 #[derive(Clone, Serialize)]
@@ -27,6 +28,7 @@ pub enum AgentEvent {
     },
     TurnComplete,
     SessionEnded,
+    #[allow(dead_code)]
     Error(String),
 }
 
@@ -34,6 +36,7 @@ pub enum AgentEvent {
 ///
 /// This function blocks the command handler until the turn is complete.
 /// Kill can interrupt it via the running flag.
+#[allow(dead_code)]
 pub async fn run_turn(
     user_message: &str,
     model: Arc<dyn ModelProvider>,

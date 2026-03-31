@@ -21,6 +21,7 @@ pub fn get_api_key(provider: &str) -> Result<Option<String>, String> {
     }
 }
 
+#[allow(dead_code)]
 pub fn delete_api_key(provider: &str) -> Result<(), String> {
     let entry = Entry::new(&format!("{}-{}", SERVICE_PREFIX, provider), "api_key")
         .map_err(|e| format!("Keyring entry error: {}", e))?;

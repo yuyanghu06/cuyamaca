@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 
 export interface ProviderInfo {
   id: string;
@@ -65,4 +65,26 @@ export async function storeApiKey(
 
 export async function hasApiKey(provider: string): Promise<boolean> {
   return invoke<boolean>("has_api_key", { provider });
+}
+
+// ── Ollama model management ──
+
+export type PullProgress =
+  | { event: "started" }
+  | { event: "downloading"; data: { completed: number; total: number } }
+  | { event: "verifying" }
+  | { event: "succeeded" }
+  | { event: "failed"; data: { error: string } };
+
+export async function pullOllamaModel(
+  model: string,
+  onProgress: (event: PullProgress) => void,
+): Promise<void> {
+  const channel = new Channel<PullProgress>();
+  channel.onmessage = onProgress;
+  return invoke("pull_ollama_model", { model, onProgress: channel });
+}
+
+export async function deleteOllamaModel(model: string): Promise<void> {
+  return invoke("delete_ollama_model", { model });
 }

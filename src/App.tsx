@@ -4,11 +4,12 @@ import PartsPanel from "./components/PartsPanel";
 import ManifestView from "./views/ManifestView";
 import CodeView from "./views/CodeView";
 import ChatView from "./views/ChatView";
+import SettingsView from "./views/SettingsView";
 import { openProject } from "./commands/projects";
 import type { Project, GeneratedSketchResponse } from "./types/manifest";
 import "./styles/globals.css";
 
-type NavView = "manifest" | "code" | "chat";
+type NavView = "manifest" | "code" | "chat" | "settings";
 
 function App() {
   const [activeView, setActiveView] = useState<NavView>("manifest");
@@ -62,6 +63,8 @@ function App() {
             onSwitchToCode={() => setActiveView("code")}
           />
         );
+      case "settings":
+        return <SettingsView />;
     }
   };
 

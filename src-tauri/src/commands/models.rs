@@ -3,7 +3,9 @@ use crate::services::model_manager::{ProviderType, SlotConfig};
 use crate::services::ollama::OllamaProvider;
 use crate::services::provider::ModelProvider;
 use crate::AppState;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
+use tauri::ipc::Channel;
 
 #[derive(Debug, Serialize)]
 pub struct ProviderInfo {
@@ -156,4 +158,101 @@ pub async fn store_api_key(provider: String, key: String) -> Result<(), String> 
 #[tauri::command]
 pub async fn has_api_key(provider: String) -> Result<bool, String> {
     Ok(keystore::get_api_key(&provider)?.is_some())
+}
+
+// ── Ollama model management ──
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "event", content = "data")]
+pub enum PullProgress {
+    Started,
+    Downloading { completed: u64, total: u64 },
+    Verifying,
+    Succeeded,
+    Failed { error: String },
+}
+
+#[tauri::command]
+pub async fn pull_ollama_model(
+    model: String,
+    on_progress: Channel<PullProgress>,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let _ = on_progress.send(PullProgress::Started);
+
+    let resp = client
+        .post("http://localhost:11434/api/pull")
+        .json(&serde_json::json!({ "name": model, "stream": true }))
+        .timeout(std::time::Duration::from_secs(3600))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to Ollama: {}", e))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        let _ = on_progress.send(PullProgress::Failed { error: text.clone() });
+        return Err(text);
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut buffer = Vec::new();
+
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
+        buffer.extend_from_slice(&bytes);
+
+        while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
+            let line: Vec<u8> = buffer.drain(..=pos).collect();
+            let trimmed = String::from_utf8_lossy(&line).trim().to_string();
+            if trimmed.is_empty() {
+                continue;
+            }
+
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(&trimmed) {
+                if let Some(error) = data["error"].as_str() {
+                    let _ = on_progress.send(PullProgress::Failed {
+                        error: error.to_string(),
+                    });
+                    return Err(error.to_string());
+                }
+
+                let status = data["status"].as_str().unwrap_or("");
+                if status.contains("pulling") || status.contains("downloading") {
+                    let completed = data["completed"].as_u64().unwrap_or(0);
+                    let total = data["total"].as_u64().unwrap_or(0);
+                    if total > 0 {
+                        let _ = on_progress.send(PullProgress::Downloading {
+                            completed,
+                            total,
+                        });
+                    }
+                } else if status.contains("verifying") || status.contains("writing") {
+                    let _ = on_progress.send(PullProgress::Verifying);
+                } else if status == "success" {
+                    let _ = on_progress.send(PullProgress::Succeeded);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_ollama_model(model: String) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .delete("http://localhost:11434/api/delete")
+        .json(&serde_json::json!({ "name": model }))
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to delete model: {}", e))?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Delete failed: {}", text));
+    }
+
+    Ok(())
 }

@@ -40,6 +40,8 @@ pub fn run() {
             commands::models::list_ollama_models,
             commands::models::store_api_key,
             commands::models::has_api_key,
+            commands::models::pull_ollama_model,
+            commands::models::delete_ollama_model,
             commands::projects::create_project,
             commands::projects::list_projects,
             commands::projects::open_project,

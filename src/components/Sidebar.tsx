@@ -12,7 +12,7 @@ import {
 import { detectArduinoCli } from "../commands/flash";
 import type { ProjectSummary, Project } from "../types/manifest";
 
-type NavView = "manifest" | "code" | "chat";
+type NavView = "manifest" | "code" | "chat" | "settings";
 
 interface SidebarProps {
   activeView: NavView;
@@ -27,6 +27,7 @@ const navItems: { id: NavView; label: string; icon: string }[] = [
   { id: "manifest", label: "Manifest", icon: "⚙" },
   { id: "code", label: "Code", icon: "⟨⟩" },
   { id: "chat", label: "Chat", icon: "◉" },
+  { id: "settings", label: "Settings", icon: "⊞" },
 ];
 
 export default function Sidebar({
@@ -127,7 +128,7 @@ export default function Sidebar({
   ];
 
   return (
-    <aside className="sidebar glass-subtle">
+    <aside className="sidebar glass-subtle" role="navigation" aria-label="Main navigation">
       <div className="sidebar-header">
         <div className="sidebar-app-name">Cuyamaca</div>
       </div>

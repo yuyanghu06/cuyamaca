@@ -131,7 +131,7 @@ export default function RuntimeChat({
         >
           Send
         </button>
-        <button className="runtime-kill-btn" onClick={onKill}>
+        <button className="runtime-kill-btn" onClick={onKill} aria-label="Emergency stop">
           KILL
         </button>
       </div>

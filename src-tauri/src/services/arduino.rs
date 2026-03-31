@@ -69,6 +69,7 @@ impl ArduinoService {
         }
     }
 
+    #[allow(unreachable_code)]
     pub async fn install(&self) -> Result<(), String> {
         let install_dir = get_install_dir()?;
         std::fs::create_dir_all(&install_dir)
@@ -81,7 +82,6 @@ impl ArduinoService {
         };
         let target_path = install_dir.join(binary_name);
 
-        // Use the install script from Arduino
         #[cfg(target_os = "macos")]
         {
             // Try brew first
@@ -128,6 +128,16 @@ impl ArduinoService {
                     }
                 }
             }
+
+            // Verify the curl/sh installation
+            if target_path.exists() {
+                *self.cli_path.write().await = Some(target_path);
+                return Ok(());
+            }
+            if self.detect().await.unwrap_or(false) {
+                return Ok(());
+            }
+            return Err("Installation completed but arduino-cli binary not found".to_string());
         }
 
         #[cfg(target_os = "windows")]
@@ -152,22 +162,10 @@ impl ArduinoService {
         }
 
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        {
-            return Err("Unsupported platform for auto-install. Please install arduino-cli manually.".to_string());
-        }
+        return Err("Unsupported platform for auto-install. Please install arduino-cli manually.".to_string());
 
-        // Verify the installation
-        if target_path.exists() {
-            *self.cli_path.write().await = Some(target_path);
-            Ok(())
-        } else {
-            // Try detecting again (brew install puts it in PATH)
-            if self.detect().await.unwrap_or(false) {
-                Ok(())
-            } else {
-                Err("Installation completed but arduino-cli binary not found".to_string())
-            }
-        }
+        #[allow(unreachable_code)]
+        Ok(())
     }
 
     pub async fn list_boards(&self) -> Result<Vec<DetectedBoard>, String> {

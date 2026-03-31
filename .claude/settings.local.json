@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l /c/Users/Yuyang Hu/Documents/cuyamaca/src-tauri/src/services/*.rs)",
+      "Bash(wc -l *.rs)"
+    ]
+  }
+}

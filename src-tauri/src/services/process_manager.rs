@@ -171,7 +171,7 @@ async fn find_ollama_binary() -> Option<String> {
     }
 
     // Try common paths
-    let candidates = vec![
+    let candidates: Vec<&str> = vec![
         #[cfg(target_os = "macos")]
         "/usr/local/bin/ollama",
         #[cfg(target_os = "macos")]

@@ -554,6 +554,26 @@ export default function CodeView({
         </GlassPanel>
       </div>
 
+      {/* Flash to Board banner — shown when tools are compiled and no pending diff */}
+      {!hasPending && project.has_tools && !isEditing && (
+        <div className="code-flash-ready-bar">
+          <div className="code-flash-ready-info">
+            <span className="code-flash-ready-dot" />
+            <span className="code-flash-ready-label">Tools compiled</span>
+            <span className="code-flash-ready-sub">
+              {project.manifest.board} · {project.manifest.serial_port}
+            </span>
+          </div>
+          <button
+            className="code-flash-ready-btn"
+            onClick={handleFlashCurrent}
+            disabled={loading || flashStatus.state !== "idle"}
+          >
+            ⚡ Flash to Board
+          </button>
+        </div>
+      )}
+
       {/* Footer actions for existing sketches */}
       {!hasPending && (
         <div className="code-footer">
@@ -569,13 +589,15 @@ export default function CodeView({
             disabled={loading}
           />
           <div className="code-footer-actions">
-            <button
-              className="code-generate-btn code-small-btn code-flash-btn"
-              onClick={handleFlashCurrent}
-              disabled={loading || flashStatus.state !== "idle"}
-            >
-              ⚡ Flash
-            </button>
+            {!project.has_tools && (
+              <button
+                className="code-generate-btn code-small-btn code-flash-btn"
+                onClick={handleFlashCurrent}
+                disabled={loading || flashStatus.state !== "idle"}
+              >
+                ⚡ Flash
+              </button>
+            )}
             <button
               className="code-generate-btn code-small-btn"
               onClick={handleGenerate}

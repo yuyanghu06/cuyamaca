@@ -33,6 +33,44 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .setup(|app| {
+            use services::keystore;
+            use services::model_manager::{ProviderType, SlotConfig};
+            use tauri::Manager;
+            use tauri_plugin_store::StoreExt;
+
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let Ok(store) = handle.store("settings.json") else { return };
+                let state = handle.state::<AppState>();
+
+                for slot in ["code", "runtime"] {
+                    let key = format!("model_config_{}", slot);
+                    let Some(value) = store.get(&key) else { continue };
+                    let provider_str = match value["provider"].as_str() {
+                        Some(s) => s.to_string(),
+                        None => continue,
+                    };
+                    let model_str = match value["model"].as_str() {
+                        Some(s) if !s.is_empty() => s.to_string(),
+                        _ => continue,
+                    };
+                    let Ok(provider_type) = provider_str.parse::<ProviderType>() else { continue };
+                    let api_key = if provider_type != ProviderType::Ollama {
+                        keystore::get_api_key(&provider_str).ok().flatten()
+                    } else {
+                        None
+                    };
+                    let config = SlotConfig { provider: provider_type, model: model_str };
+                    match slot {
+                        "code" => { let _ = state.model_manager.configure_code_model(config, api_key).await; }
+                        "runtime" => { let _ = state.model_manager.configure_runtime_model(config, api_key).await; }
+                        _ => {}
+                    }
+                }
+            });
+            Ok(())
+        })
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::debug::ping,

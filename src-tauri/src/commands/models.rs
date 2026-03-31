@@ -6,6 +6,7 @@ use crate::AppState;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
+use tauri_plugin_store::StoreExt;
 
 #[derive(Debug, Serialize)]
 pub struct ProviderInfo {
@@ -54,6 +55,7 @@ pub fn list_providers() -> Vec<ProviderInfo> {
 
 #[tauri::command]
 pub async fn configure_model_slot(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     slot: String,
     provider: String,
@@ -95,6 +97,18 @@ pub async fn configure_model_slot(
         }
         _ => return Err(format!("Invalid slot: {}. Use 'code' or 'runtime'", slot)),
     };
+
+    // Persist provider + model so they survive restarts
+    let store = app
+        .store("settings.json")
+        .map_err(|e| format!("Failed to open settings store: {}", e))?;
+    store.set(
+        format!("model_config_{}", slot),
+        serde_json::json!({ "provider": provider, "model": model }),
+    );
+    store
+        .save()
+        .map_err(|e| format!("Failed to save settings: {}", e))?;
 
     Ok(SlotConfigResponse {
         provider,

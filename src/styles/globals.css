@@ -1660,11 +1660,31 @@ body {
 }
 
 .chat-input-capsule {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 8px;
   padding: 8px 10px !important;
   border-radius: var(--radius-capsule) !important;
+}
+
+/* Gradient ring that fades in on focus — mask cuts out the center so only
+   the 2px border area is visible, matching the capsule's pill shape */
+.chat-input-capsule::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: calc(var(--radius-capsule) + 2px);
+  padding: 2px;
+  background: linear-gradient(120deg, var(--amber-gold), var(--violet-slate) 55%, var(--sky-blue));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
 }
 
 .chat-input {
@@ -1683,6 +1703,19 @@ body {
 
 .chat-input::placeholder {
   color: var(--text-tertiary);
+}
+
+.chat-input:focus {
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-input-capsule:focus-within {
+  outline: none;
+}
+
+.chat-input-capsule:focus-within::before {
+  opacity: 1;
 }
 
 .chat-send-btn {

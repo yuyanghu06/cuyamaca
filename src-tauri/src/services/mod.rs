@@ -15,3 +15,5 @@ pub mod camera;
 pub mod context;
 pub mod tool_dispatch;
 pub mod agent;
+pub mod dependency;
+pub mod process_manager;

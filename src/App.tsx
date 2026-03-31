@@ -1,11 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import PartsPanel from "./components/PartsPanel";
 import ManifestView from "./views/ManifestView";
 import CodeView from "./views/CodeView";
 import ChatView from "./views/ChatView";
 import SettingsView from "./views/SettingsView";
+import SetupWizard from "./views/SetupWizard";
 import { openProject } from "./commands/projects";
+import { isSetupComplete, checkDependencies } from "./commands/setup";
 import type { Project, GeneratedSketchResponse } from "./types/manifest";
 import "./styles/globals.css";
 
@@ -16,6 +18,28 @@ function App() {
   const [partsPanelCollapsed, setPartsPanelCollapsed] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [pendingSketch, setPendingSketch] = useState<GeneratedSketchResponse | null>(null);
+  const [showWizard, setShowWizard] = useState<boolean | null>(null);
+
+  // Check if first-run wizard should be shown
+  useEffect(() => {
+    (async () => {
+      try {
+        const complete = await isSetupComplete();
+        if (complete) {
+          setShowWizard(false);
+          return;
+        }
+        // Not marked complete: check if deps are actually available
+        const status = await checkDependencies();
+        const allReady =
+          status.ollama.state === "ready" &&
+          status.arduinoCli.state === "ready";
+        setShowWizard(!allReady);
+      } catch {
+        setShowWizard(false);
+      }
+    })();
+  }, []);
 
   const refreshActiveProject = useCallback(async () => {
     if (!activeProject) return;
@@ -67,6 +91,33 @@ function App() {
         return <SettingsView />;
     }
   };
+
+  // Show nothing while checking setup status
+  if (showWizard === null) {
+    return (
+      <>
+        <div className="app-background" />
+        <div className="setup-wizard">
+          <div className="setup-wizard-inner">
+            <div className="setup-header">
+              <div className="setup-icon">◈</div>
+              <p className="setup-subtitle">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Show first-run wizard if deps are missing
+  if (showWizard) {
+    return (
+      <>
+        <div className="app-background" />
+        <SetupWizard onComplete={() => setShowWizard(false)} />
+      </>
+    );
+  }
 
   return (
     <>

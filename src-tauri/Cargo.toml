@@ -28,4 +28,7 @@ dirs = "6"
 similar = "2"
 image = "0.25"
 base64 = "0.22"
+flate2 = "1"
+tar = "0.4"
+zip = "2"
 

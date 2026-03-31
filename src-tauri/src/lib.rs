@@ -6,6 +6,7 @@ use commands::runtime::RuntimeSession;
 use models::project::Project;
 use services::arduino::ArduinoService;
 use services::model_manager::ModelManager;
+use services::process_manager::ProcessManager;
 use services::serial::SerialConnection;
 use std::sync::Mutex;
 
@@ -15,6 +16,7 @@ pub struct AppState {
     pub arduino: ArduinoService,
     pub serial: Mutex<Option<SerialConnection>>,
     pub runtime: Mutex<Option<RuntimeSession>>,
+    pub process_manager: ProcessManager,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,6 +27,7 @@ pub fn run() {
         arduino: ArduinoService::new(),
         serial: Mutex::new(None),
         runtime: Mutex::new(None),
+        process_manager: ProcessManager::new(),
     };
 
     tauri::Builder::default()
@@ -78,6 +81,11 @@ pub fn run() {
             commands::runtime::runtime_send_message,
             commands::runtime::runtime_kill,
             commands::runtime::close_runtime_window,
+            commands::setup::check_dependencies,
+            commands::setup::install_dependency,
+            commands::setup::skip_dependency_setup,
+            commands::setup::mark_setup_complete,
+            commands::setup::is_setup_complete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

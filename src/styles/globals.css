@@ -2411,3 +2411,266 @@ input:focus-visible {
 .code-upload-btn {
   transition: all 150ms ease;
 }
+
+/* ────────────────────────────────────────────────────────
+   22. Setup Wizard
+   ──────────────────────────────────────────────────────── */
+
+.setup-wizard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 24px;
+}
+
+.setup-wizard-inner {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.setup-header {
+  text-align: center;
+}
+
+.setup-icon {
+  font-size: 36px;
+  color: var(--amber-gold);
+  margin-bottom: 8px;
+}
+
+.setup-title {
+  font-family: var(--font-ui);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.setup-subtitle {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.setup-deps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setup-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.setup-continue-btn {
+  width: 100%;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  border: 0.5px solid var(--sky-blue);
+  background: rgba(128, 144, 180, 0.12);
+  color: var(--sky-blue);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.setup-continue-btn:hover:not(:disabled) {
+  background: rgba(128, 144, 180, 0.22);
+}
+
+.setup-continue-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.setup-skip-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 150ms ease;
+}
+
+.setup-skip-btn:hover:not(:disabled) {
+  color: var(--text-secondary);
+}
+
+.setup-skip-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Dependency Row ── */
+
+.dep-row {
+  padding: 14px 16px;
+}
+
+.dep-row-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dep-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dep-ready .dep-icon {
+  background: rgba(93, 160, 120, 0.15);
+  color: var(--green);
+}
+
+.dep-missing .dep-icon-missing,
+.dep-unhealthy .dep-icon-missing {
+  background: rgba(180, 80, 70, 0.12);
+  color: var(--red);
+}
+
+.dep-installing .dep-icon-spin {
+  background: rgba(128, 144, 180, 0.12);
+  color: var(--sky-blue);
+  animation: dep-spin 1.2s linear infinite;
+}
+
+@keyframes dep-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.dep-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dep-label {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dep-version {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.dep-path {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dep-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dep-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.dep-badge-ready {
+  background: rgba(93, 160, 120, 0.12);
+  color: var(--green);
+}
+
+.dep-badge-installing {
+  background: rgba(128, 144, 180, 0.12);
+  color: var(--sky-blue);
+  font-family: var(--font-mono);
+}
+
+.dep-install-btn {
+  padding: 5px 16px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--sky-blue);
+  background: rgba(128, 144, 180, 0.08);
+  color: var(--sky-blue);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+.dep-install-btn:hover {
+  background: rgba(128, 144, 180, 0.18);
+}
+
+.dep-progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.dep-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--sky-blue);
+  transition: width 0.3s ease-out;
+}
+
+.dep-error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(180, 80, 70, 0.08);
+  border: 0.5px solid rgba(180, 80, 70, 0.3);
+  color: var(--red);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dep-retry-btn {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--red);
+  background: rgba(180, 80, 70, 0.08);
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dep-retry-btn:hover {
+  background: rgba(180, 80, 70, 0.16);
+}

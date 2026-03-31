@@ -5,3 +5,4 @@ pub mod codegen;
 pub mod flash;
 pub mod serial;
 pub mod runtime;
+pub mod setup;

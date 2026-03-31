@@ -11,6 +11,8 @@ import {
   hasApiKey,
   pullOllamaModel,
   deleteOllamaModel,
+  getCodeGenPrompt,
+  saveCodeGenPrompt,
   type ModelTestResult,
 } from "../commands/models";
 import { detectArduinoCli } from "../commands/flash";
@@ -106,6 +108,7 @@ export default function SettingsView() {
       </div>
       <div className="settings-scroll">
         <ModelsSection installedOllamaModels={installedOllamaModels} />
+        <CodeGenPromptSection />
         <OllamaModelsSection onPullComplete={refreshInstalledModels} />
         <ConnectionsSection />
         <AboutSection />
@@ -386,6 +389,60 @@ function ModelSlot({ slot, label, providers, multimodalOnly, installedOllamaMode
         </div>
       )}
     </GlassPanel>
+  );
+}
+
+/* ─── Code Generation Prompt Section ─── */
+
+function CodeGenPromptSection() {
+  const [prompt, setPrompt] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getCodeGenPrompt().then(setPrompt).catch(() => {});
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      await saveCodeGenPrompt(prompt);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }, [prompt]);
+
+  return (
+    <section className="settings-section">
+      <div className="label settings-section-label">Code Generation</div>
+      <GlassPanel tier="standard" className="settings-card">
+        <div className="settings-field" style={{ flex: 1 }}>
+          <label className="label">Custom Instructions</label>
+          <p className="text-secondary" style={{ margin: "4px 0 8px", fontSize: 12 }}>
+            Appended to every code generation and chat request. Describe coding style, naming conventions, libraries to use, or any constraints for generated sketches.
+          </p>
+          <textarea
+            className="settings-input settings-prompt-textarea"
+            placeholder="e.g. Use PID control for motors. Prefer the AccelStepper library. Always add watchdog timer reset in loop()."
+            value={prompt}
+            onChange={(e) => { setPrompt(e.target.value); setSaved(false); }}
+            rows={4}
+          />
+        </div>
+        <div className="settings-card-actions">
+          <button
+            className="settings-btn settings-btn-primary"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+          </button>
+        </div>
+      </GlassPanel>
+    </section>
   );
 }
 

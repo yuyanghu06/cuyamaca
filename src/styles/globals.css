@@ -1395,12 +1395,56 @@ body {
   color: var(--red);
 }
 
+.code-footer {
+  display: flex;
+  flex-direction: column;
+  border-top: 0.5px solid rgba(212, 180, 140, 0.20);
+  flex-shrink: 0;
+}
+
 .code-footer-actions {
   display: flex;
   gap: 8px;
   padding: 8px 16px;
-  border-top: 0.5px solid rgba(212, 180, 140, 0.20);
   flex-shrink: 0;
+}
+
+/* Instruction input shared between empty state and footer */
+.code-gen-instruction-input {
+  width: 100%;
+  border: none;
+  border-bottom: 0.5px solid rgba(212, 180, 140, 0.20);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  resize: none;
+  outline: none;
+  padding: 8px 16px;
+  box-sizing: border-box;
+  transition: background 150ms ease;
+}
+
+.code-gen-instruction-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.code-gen-instruction-input:focus {
+  background: rgba(212, 180, 140, 0.05);
+}
+
+/* In the empty state card: full-width, no bottom border, normal top border */
+.code-empty-card .code-gen-instruction-input {
+  border: 0.5px solid var(--glass-standard-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  padding: 8px 12px;
+}
+
+/* Footer variant: single-row feel */
+.code-gen-instruction-footer {
+  min-height: unset;
 }
 
 /* Syntax highlighting */
@@ -2353,6 +2397,15 @@ body {
 .settings-select:focus,
 .settings-input:focus {
   border-color: var(--sky-blue);
+}
+
+.settings-prompt-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+  font-family: var(--font-ui);
+  box-sizing: border-box;
 }
 
 .settings-select {

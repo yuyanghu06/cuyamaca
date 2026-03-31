@@ -59,10 +59,15 @@ impl CodeGenService {
     pub async fn generate_sketch(
         provider: &dyn ModelProvider,
         manifest: &Manifest,
+        extra_prompt: Option<&str>,
+        instruction: Option<&str>,
     ) -> Result<GeneratedSketchResponse, String> {
-        let system_prompt = build_system_prompt(manifest);
-        let user_prompt =
-            "Generate a complete Arduino sketch for this hardware configuration. Include all sensor reading, actuator control, and the serial command dispatch loop.".to_string();
+        let system_prompt = build_system_prompt(manifest, extra_prompt);
+        let base = "Generate a complete Arduino sketch for this hardware configuration. Include all sensor reading, actuator control, and the serial command dispatch loop.";
+        let user_prompt = match instruction.map(str::trim).filter(|s| !s.is_empty()) {
+            Some(instr) => format!("{}\n\nAdditional instructions: {}", base, instr),
+            None => base.to_string(),
+        };
 
         let request = CompletionRequest {
             messages: vec![ChatMessage {
@@ -90,8 +95,9 @@ impl CodeGenService {
         current_sketch: &str,
         instruction: &str,
         conversation_history: &[ChatMessage],
+        extra_prompt: Option<&str>,
     ) -> Result<GeneratedSketchResponse, String> {
-        let system_prompt = build_system_prompt(manifest);
+        let system_prompt = build_system_prompt(manifest, extra_prompt);
 
         let mut messages: Vec<ChatMessage> = conversation_history.to_vec();
 
@@ -178,8 +184,9 @@ Respond with ONLY the JSON array, no explanation."#,
         manifest: &Manifest,
         current_sketch: Option<&str>,
         messages: &[ChatMessage],
+        extra_prompt: Option<&str>,
     ) -> Result<(String, Option<GeneratedSketchResponse>), String> {
-        let system_prompt = build_chat_system_prompt(manifest, current_sketch);
+        let system_prompt = build_chat_system_prompt(manifest, current_sketch, extra_prompt);
 
         let request = CompletionRequest {
             messages: messages.to_vec(),
@@ -210,21 +217,29 @@ Respond with ONLY the JSON array, no explanation."#,
     }
 }
 
-fn build_system_prompt(manifest: &Manifest) -> String {
+fn build_system_prompt(manifest: &Manifest, extra: Option<&str>) -> String {
     let manifest_json = serde_json::to_string_pretty(manifest).unwrap_or_default();
     let pin_summary = build_pin_summary(manifest);
     let template = get_generate_prompt();
-    template
+    let mut prompt = template
         .replace("{baud}", &manifest.baud_rate.to_string())
         .replace("{manifest}", &manifest_json)
-        .replace("{pins}", &pin_summary)
+        .replace("{pins}", &pin_summary);
+    if let Some(extra) = extra {
+        let trimmed = extra.trim();
+        if !trimmed.is_empty() {
+            prompt.push_str("\n\n## Project-Specific Instructions\n");
+            prompt.push_str(trimmed);
+        }
+    }
+    prompt
 }
 
-fn build_chat_system_prompt(manifest: &Manifest, current_sketch: Option<&str>) -> String {
-    build_chat_system_prompt_pub(manifest, current_sketch)
+fn build_chat_system_prompt(manifest: &Manifest, current_sketch: Option<&str>, extra: Option<&str>) -> String {
+    build_chat_system_prompt_pub(manifest, current_sketch, extra)
 }
 
-pub fn build_chat_system_prompt_pub(manifest: &Manifest, current_sketch: Option<&str>) -> String {
+pub fn build_chat_system_prompt_pub(manifest: &Manifest, current_sketch: Option<&str>, extra: Option<&str>) -> String {
     let manifest_json = serde_json::to_string_pretty(manifest).unwrap_or_default();
     let pin_summary = build_pin_summary(manifest);
     let sketch_section = match current_sketch {
@@ -235,11 +250,19 @@ pub fn build_chat_system_prompt_pub(manifest: &Manifest, current_sketch: Option<
         None => "No sketch exists yet. If the user asks you to generate one, return the complete sketch in a ```cpp code fence.".to_string(),
     };
     let template = get_chat_prompt();
-    template
+    let mut prompt = template
         .replace("{baud}", &manifest.baud_rate.to_string())
         .replace("{manifest}", &manifest_json)
         .replace("{pins}", &pin_summary)
-        .replace("{sketch_section}", &sketch_section)
+        .replace("{sketch_section}", &sketch_section);
+    if let Some(extra) = extra {
+        let trimmed = extra.trim();
+        if !trimmed.is_empty() {
+            prompt.push_str("\n\n## Project-Specific Instructions\n");
+            prompt.push_str(trimmed);
+        }
+    }
+    prompt
 }
 
 fn build_pin_summary(manifest: &Manifest) -> String {

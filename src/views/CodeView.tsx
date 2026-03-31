@@ -140,13 +140,14 @@ export default function CodeView({
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState(13);
+  const [generateInstruction, setGenerateInstruction] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerate = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await generateSketch();
+      const result = await generateSketch(generateInstruction || undefined);
       onPendingSketch(result);
     } catch (err) {
       const msg = String(err);
@@ -160,7 +161,7 @@ export default function CodeView({
     } finally {
       setLoading(false);
     }
-  }, [onPendingSketch]);
+  }, [onPendingSketch, generateInstruction]);
 
   const handleUpload = useCallback(() => {
     fileInputRef.current?.click();
@@ -343,6 +344,17 @@ export default function CodeView({
               Generate a sketch from your manifest or upload your own .ino file.
             </div>
             {error && <div className="code-error">{error}</div>}
+            <textarea
+              className="code-gen-instruction-input"
+              placeholder="Optional instructions… e.g. use PID for motor control, add watchdog timer, prefer AccelStepper library"
+              value={generateInstruction}
+              onChange={(e) => setGenerateInstruction(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
+              }}
+              rows={2}
+              disabled={loading}
+            />
             <div className="code-empty-actions">
               <button
                 className="code-generate-btn"
@@ -544,28 +556,41 @@ export default function CodeView({
 
       {/* Footer actions for existing sketches */}
       {!hasPending && (
-        <div className="code-footer-actions">
-          <button
-            className="code-generate-btn code-small-btn code-flash-btn"
-            onClick={handleFlashCurrent}
-            disabled={loading || flashStatus.state !== "idle"}
-          >
-            ⚡ Flash
-          </button>
-          <button
-            className="code-generate-btn code-small-btn"
-            onClick={handleGenerate}
+        <div className="code-footer">
+          <textarea
+            className="code-gen-instruction-input code-gen-instruction-footer"
+            placeholder="Optional instructions for regenerate… (⌘↵ to run)"
+            value={generateInstruction}
+            onChange={(e) => setGenerateInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleGenerate();
+            }}
+            rows={1}
             disabled={loading}
-          >
-            {loading ? "Generating…" : "Regenerate"}
-          </button>
-          <button
-            className="code-upload-btn code-small-btn"
-            onClick={handleUpload}
-            disabled={loading}
-          >
-            Upload .ino
-          </button>
+          />
+          <div className="code-footer-actions">
+            <button
+              className="code-generate-btn code-small-btn code-flash-btn"
+              onClick={handleFlashCurrent}
+              disabled={loading || flashStatus.state !== "idle"}
+            >
+              ⚡ Flash
+            </button>
+            <button
+              className="code-generate-btn code-small-btn"
+              onClick={handleGenerate}
+              disabled={loading}
+            >
+              {loading ? "Generating…" : "Regenerate"}
+            </button>
+            <button
+              className="code-upload-btn code-small-btn"
+              onClick={handleUpload}
+              disabled={loading}
+            >
+              Upload .ino
+            </button>
+          </div>
         </div>
       )}
 

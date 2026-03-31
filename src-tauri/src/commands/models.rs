@@ -294,6 +294,32 @@ pub async fn pull_ollama_model(
 }
 
 #[tauri::command]
+pub async fn get_code_gen_prompt(
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let prompt = state.code_gen_prompt.lock().map_err(|e| e.to_string())?;
+    Ok(prompt.clone())
+}
+
+#[tauri::command]
+pub async fn save_code_gen_prompt(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    prompt: String,
+) -> Result<(), String> {
+    {
+        let mut p = state.code_gen_prompt.lock().map_err(|e| e.to_string())?;
+        *p = prompt.clone();
+    }
+    let store = app
+        .store("settings.json")
+        .map_err(|e| format!("Failed to open settings store: {}", e))?;
+    store.set("code_gen_prompt", serde_json::json!(prompt));
+    store.save().map_err(|e| format!("Failed to save settings: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn delete_ollama_model(model: String) -> Result<(), String> {
     let client = reqwest::Client::new();
     let resp = client

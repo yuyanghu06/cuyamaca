@@ -93,3 +93,11 @@ export async function pullOllamaModel(
 export async function deleteOllamaModel(model: string): Promise<void> {
   return invoke("delete_ollama_model", { model });
 }
+
+export async function getCodeGenPrompt(): Promise<string> {
+  return invoke<string>("get_code_gen_prompt");
+}
+
+export async function saveCodeGenPrompt(prompt: string): Promise<void> {
+  return invoke("save_code_gen_prompt", { prompt });
+}

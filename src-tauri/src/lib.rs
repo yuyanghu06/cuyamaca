@@ -17,6 +17,7 @@ pub struct AppState {
     pub serial: Mutex<Option<SerialConnection>>,
     pub runtime: Mutex<Option<RuntimeSession>>,
     pub process_manager: ProcessManager,
+    pub code_gen_prompt: Mutex<String>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -28,6 +29,7 @@ pub fn run() {
         serial: Mutex::new(None),
         runtime: Mutex::new(None),
         process_manager: ProcessManager::new(),
+        code_gen_prompt: Mutex::new(String::new()),
     };
 
     tauri::Builder::default()
@@ -43,6 +45,13 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let Ok(store) = handle.store("settings.json") else { return };
                 let state = handle.state::<AppState>();
+
+                // Restore custom code generation prompt
+                if let Some(prompt) = store.get("code_gen_prompt").and_then(|v| v.as_str().map(|s| s.to_string())) {
+                    if let Ok(mut p) = state.code_gen_prompt.lock() {
+                        *p = prompt;
+                    }
+                }
 
                 for slot in ["code", "runtime"] {
                     let key = format!("model_config_{}", slot);
@@ -84,6 +93,8 @@ pub fn run() {
             commands::models::has_api_key,
             commands::models::pull_ollama_model,
             commands::models::delete_ollama_model,
+            commands::models::get_code_gen_prompt,
+            commands::models::save_code_gen_prompt,
             commands::projects::create_project,
             commands::projects::list_projects,
             commands::projects::open_project,

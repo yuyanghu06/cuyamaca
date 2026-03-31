@@ -29,6 +29,7 @@ static CONVERSATION: std::sync::LazyLock<Mutex<ConversationState>> =
 #[tauri::command]
 pub async fn generate_sketch(
     state: tauri::State<'_, AppState>,
+    instruction: Option<String>,
 ) -> Result<GeneratedSketchResponse, String> {
     let manifest = {
         let active = state
@@ -39,8 +40,14 @@ pub async fn generate_sketch(
         project.manifest.clone()
     };
 
+    let extra_prompt = state.code_gen_prompt.lock().map_err(|e| e.to_string())?.clone();
     let provider = state.model_manager.code_model().await?;
-    CodeGenService::generate_sketch(provider.as_ref(), &manifest).await
+    CodeGenService::generate_sketch(
+        provider.as_ref(),
+        &manifest,
+        Some(extra_prompt.as_str()).filter(|s| !s.is_empty()),
+        instruction.as_deref().filter(|s| !s.trim().is_empty()),
+    ).await
 }
 
 #[tauri::command]
@@ -67,6 +74,7 @@ pub async fn modify_sketch(
         conv.history.clone()
     };
 
+    let extra_prompt = state.code_gen_prompt.lock().map_err(|e| e.to_string())?.clone();
     let provider = state.model_manager.code_model().await?;
     CodeGenService::modify_sketch(
         provider.as_ref(),
@@ -74,6 +82,7 @@ pub async fn modify_sketch(
         &current_sketch,
         &instruction,
         &history,
+        Some(extra_prompt.as_str()).filter(|s| !s.is_empty()),
     )
     .await
 }
@@ -286,6 +295,7 @@ pub async fn send_chat_message(
         });
     }
 
+    let extra_prompt = state.code_gen_prompt.lock().map_err(|e| e.to_string())?.clone();
     let provider = state.model_manager.code_model().await?;
 
     let history = {
@@ -298,6 +308,7 @@ pub async fn send_chat_message(
         &manifest,
         current_sketch.as_deref(),
         &history,
+        Some(extra_prompt.as_str()).filter(|s| !s.is_empty()),
     )
     .await?;
 
@@ -361,6 +372,7 @@ pub async fn stream_chat_message(
         });
     }
 
+    let extra_prompt = state.code_gen_prompt.lock().map_err(|e| e.to_string())?.clone();
     let provider = state.model_manager.code_model().await?;
 
     let history = {
@@ -370,7 +382,11 @@ pub async fn stream_chat_message(
 
     let system_prompt = {
         use crate::services::code_gen::build_chat_system_prompt_pub;
-        build_chat_system_prompt_pub(&manifest, current_sketch.as_deref())
+        build_chat_system_prompt_pub(
+            &manifest,
+            current_sketch.as_deref(),
+            Some(extra_prompt.as_str()).filter(|s| !s.is_empty()),
+        )
     };
 
     let request = CompletionRequest {

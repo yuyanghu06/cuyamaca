@@ -10,8 +10,10 @@ export type ChatStreamEvent =
   | { type: "Complete"; data: ChatResponse }
   | { type: "Error"; data: string };
 
-export async function generateSketch(): Promise<GeneratedSketchResponse> {
-  return invoke<GeneratedSketchResponse>("generate_sketch");
+export async function generateSketch(instruction?: string): Promise<GeneratedSketchResponse> {
+  return invoke<GeneratedSketchResponse>("generate_sketch", {
+    instruction: instruction?.trim() || null,
+  });
 }
 
 export async function modifySketch(

@@ -39,6 +39,49 @@ const EXTERNAL_MODELS: Record<string, { id: string; name: string; multimodal: bo
   ],
 };
 
+// Curated catalog of well-known Ollama models.
+// These are shown in the selector even when not yet installed, so users can
+// pick a model and pull it in one step from the Ollama Models section.
+interface OllamaCatalogEntry {
+  id: string;      // model tag used by ollama pull / run
+  name: string;    // human-readable label
+  multimodal: boolean;
+  size?: string;   // rough param count for display
+}
+
+const OLLAMA_CATALOG: OllamaCatalogEntry[] = [
+  // ── Vision / Multimodal ──────────────────────────────────────────────────
+  { id: "llava:7b",              name: "LLaVA 1.6 (7B)",             multimodal: true,  size: "7B"  },
+  { id: "llava:13b",             name: "LLaVA 1.6 (13B)",            multimodal: true,  size: "13B" },
+  { id: "llava:34b",             name: "LLaVA 1.6 (34B)",            multimodal: true,  size: "34B" },
+  { id: "llava-llama3:8b",       name: "LLaVA-LLaMA3 (8B)",          multimodal: true,  size: "8B"  },
+  { id: "llava-phi3:3.8b",       name: "LLaVA-Phi3 (3.8B)",          multimodal: true,  size: "3.8B"},
+  { id: "bakllava:7b",           name: "BakLLaVA (7B)",               multimodal: true,  size: "7B"  },
+  { id: "moondream:latest",      name: "Moondream 2",                 multimodal: true,  size: "1.8B"},
+  { id: "llama3.2-vision:11b",   name: "Llama 3.2 Vision (11B)",     multimodal: true,  size: "11B" },
+  { id: "llama3.2-vision:90b",   name: "Llama 3.2 Vision (90B)",     multimodal: true,  size: "90B" },
+  // ── General / Code ───────────────────────────────────────────────────────
+  { id: "llama3.2:1b",           name: "Llama 3.2 (1B)",             multimodal: false, size: "1B"  },
+  { id: "llama3.2:3b",           name: "Llama 3.2 (3B)",             multimodal: false, size: "3B"  },
+  { id: "llama3.1:8b",           name: "Llama 3.1 (8B)",             multimodal: false, size: "8B"  },
+  { id: "llama3.1:70b",          name: "Llama 3.1 (70B)",            multimodal: false, size: "70B" },
+  { id: "llama3:8b",             name: "Llama 3 (8B)",               multimodal: false, size: "8B"  },
+  { id: "mistral:7b",            name: "Mistral (7B)",               multimodal: false, size: "7B"  },
+  { id: "mistral-nemo:12b",      name: "Mistral Nemo (12B)",         multimodal: false, size: "12B" },
+  { id: "codestral:22b",         name: "Codestral (22B)",            multimodal: false, size: "22B" },
+  { id: "qwen2.5-coder:7b",      name: "Qwen 2.5 Coder (7B)",        multimodal: false, size: "7B"  },
+  { id: "qwen2.5-coder:32b",     name: "Qwen 2.5 Coder (32B)",       multimodal: false, size: "32B" },
+  { id: "deepseek-coder:6.7b",   name: "DeepSeek Coder (6.7B)",      multimodal: false, size: "6.7B"},
+  { id: "deepseek-coder-v2:16b", name: "DeepSeek Coder V2 (16B)",    multimodal: false, size: "16B" },
+  { id: "phi4:14b",              name: "Phi-4 (14B)",                multimodal: false, size: "14B" },
+  { id: "phi3:3.8b",             name: "Phi-3 (3.8B)",               multimodal: false, size: "3.8B"},
+  { id: "phi3:14b",              name: "Phi-3 (14B)",                multimodal: false, size: "14B" },
+  { id: "gemma2:9b",             name: "Gemma 2 (9B)",               multimodal: false, size: "9B"  },
+  { id: "gemma2:27b",            name: "Gemma 2 (27B)",              multimodal: false, size: "27B" },
+  { id: "codegemma:7b",          name: "CodeGemma (7B)",             multimodal: false, size: "7B"  },
+  { id: "starcoder2:7b",         name: "StarCoder2 (7B)",            multimodal: false, size: "7B"  },
+];
+
 type HealthStatus = "green" | "amber" | "red";
 
 export default function SettingsView() {
@@ -95,7 +138,7 @@ interface ModelSlotProps {
 function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
-  const [ollamaModels, setOllamaModels] = useState<ModelInfo[]>([]);
+  const [installedOllamaModels, setInstalledOllamaModels] = useState<ModelInfo[]>([]);
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [health, setHealth] = useState<HealthStatus>("red");
@@ -117,10 +160,10 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
     checkModelHealth(slot).then((ok) => setHealth(ok ? "green" : "red")).catch(() => {});
   }, [slot]);
 
-  // Load Ollama models when provider is ollama
+  // Load installed Ollama models when provider is ollama
   useEffect(() => {
     if (provider === "ollama") {
-      listOllamaModels().then(setOllamaModels).catch(() => setOllamaModels([]));
+      listOllamaModels().then(setInstalledOllamaModels).catch(() => setInstalledOllamaModels([]));
     }
   }, [provider]);
 
@@ -131,9 +174,26 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
     }
   }, [provider]);
 
-  const availableModels = provider === "ollama"
-    ? (multimodalOnly ? ollamaModels.filter((m) => m.multimodal) : ollamaModels)
-    : (EXTERNAL_MODELS[provider] ?? []).filter((m) => !multimodalOnly || m.multimodal);
+  // Build the model list for Ollama: installed first, then uninstalled catalog entries
+  const installedIds = new Set(installedOllamaModels.map((m) => m.id));
+
+  const catalogFiltered = OLLAMA_CATALOG.filter(
+    (m) => !multimodalOnly || m.multimodal,
+  );
+
+  // Installed models from the live Ollama list (may include user-pulled models not in catalog)
+  const installedModels = installedOllamaModels
+    .filter((m) => !multimodalOnly || m.multimodal)
+    .map((m) => ({ id: m.id, name: m.name ?? m.id, multimodal: m.multimodal, installed: true }));
+
+  // Catalog entries not yet installed
+  const catalogNotInstalled = catalogFiltered
+    .filter((m) => !installedIds.has(m.id))
+    .map((m) => ({ ...m, installed: false }));
+
+  const externalModels = (EXTERNAL_MODELS[provider] ?? []).filter(
+    (m) => !multimodalOnly || m.multimodal,
+  );
 
   const handleSave = useCallback(async () => {
     if (!model) return;
@@ -213,12 +273,34 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
             onChange={(e) => setModel(e.target.value)}
           >
             <option value="">Select model…</option>
-            {availableModels.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name ?? m.id}
-                {multimodalOnly && m.multimodal ? " 📷" : ""}
-              </option>
-            ))}
+            {provider === "ollama" ? (
+              <>
+                {installedModels.length > 0 && (
+                  <optgroup label="Installed">
+                    {installedModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}{m.multimodal ? " 📷" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {catalogNotInstalled.length > 0 && (
+                  <optgroup label="Available to Pull">
+                    {catalogNotInstalled.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}{m.multimodal ? " 📷" : ""}{m.size ? ` — ${m.size}` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </>
+            ) : (
+              externalModels.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))
+            )}
           </select>
         </div>
       </div>

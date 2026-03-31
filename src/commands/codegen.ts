@@ -1,9 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, Channel } from "@tauri-apps/api/core";
 import type {
   GeneratedSketchResponse,
   SerialToolDefinition,
   ChatResponse,
 } from "../types/manifest";
+
+export type ChatStreamEvent =
+  | { type: "Token"; data: string }
+  | { type: "Complete"; data: ChatResponse }
+  | { type: "Error"; data: string };
 
 export async function generateSketch(): Promise<GeneratedSketchResponse> {
   return invoke<GeneratedSketchResponse>("generate_sketch");
@@ -41,6 +46,15 @@ export async function sendChatMessage(
   message: string,
 ): Promise<ChatResponse> {
   return invoke<ChatResponse>("send_chat_message", { message });
+}
+
+export async function streamChatMessage(
+  message: string,
+  onEvent: (event: ChatStreamEvent) => void,
+): Promise<void> {
+  const channel = new Channel<ChatStreamEvent>();
+  channel.onmessage = onEvent;
+  return invoke("stream_chat_message", { message, channel });
 }
 
 export async function clearChatHistory(): Promise<void> {

@@ -8,8 +8,11 @@ import {
   listProjects,
   createProject,
   openProject,
+  deleteProject,
+  getProjectsPath,
 } from "../commands/projects";
 import { detectArduinoCli } from "../commands/flash";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ProjectSummary, Project } from "../types/manifest";
 
 type NavView = "manifest" | "code" | "chat" | "settings";
@@ -44,6 +47,8 @@ export default function Sidebar({
   const [showNewProject, setShowNewProject] = useState(false);
   const [newName, setNewName] = useState("");
   const [newBoard, setNewBoard] = useState("arduino:avr:uno");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [projectsPath, setProjectsPath] = useState<string | null>(null);
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -87,6 +92,7 @@ export default function Sidebar({
   useEffect(() => {
     refreshProjects();
     pollHealth();
+    getProjectsPath().then(setProjectsPath).catch(() => {});
     const interval = setInterval(pollHealth, 30_000);
     const onFocus = () => { pollHealth(); refreshProjects(); };
     window.addEventListener("focus", onFocus);
@@ -120,6 +126,26 @@ export default function Sidebar({
     }
   };
 
+  const handleDeleteProject = async (name: string) => {
+    try {
+      await deleteProject(name);
+      refreshProjects();
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    }
+  };
+
+  const handleRevealProjects = async () => {
+    if (projectsPath) {
+      try {
+        await revealItemInDir(projectsPath);
+      } catch (err) {
+        console.error("Failed to reveal projects folder:", err);
+      }
+    }
+  };
+
   const healthItems: { label: string; status: HealthStatus }[] = [
     { label: "Ollama", status: ollamaStatus },
     { label: "arduino-cli", status: arduinoCliStatus },
@@ -139,18 +165,49 @@ export default function Sidebar({
           Projects
         </div>
         {projects.map((p) => (
-          <div
-            key={p.name}
-            className={`nav-item ${activeProject?.name === p.name ? "active" : ""}`}
-            onClick={() => handleOpenProject(p.name)}
-          >
-            <span className="nav-icon">◆</span>
-            <span className="nav-label">
-              <span>{p.name}</span>
-              <span className="project-meta text-secondary">
-                {p.board.split(":").pop()} · {p.component_count}
-              </span>
-            </span>
+          <div key={p.name} className="sidebar-project-row">
+            {confirmDelete === p.name ? (
+              <div className="sidebar-confirm-delete">
+                <span className="text-secondary" style={{ fontSize: 11 }}>Delete "{p.name}"?</span>
+                <div className="sidebar-confirm-actions">
+                  <button
+                    className="sidebar-delete-confirm-btn"
+                    onClick={() => handleDeleteProject(p.name)}
+                  >
+                    Delete
+                  </button>
+                  <button
+                    className="sidebar-cancel-btn"
+                    onClick={() => setConfirmDelete(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`nav-item ${activeProject?.name === p.name ? "active" : ""}`}
+                onClick={() => handleOpenProject(p.name)}
+              >
+                <span className="nav-icon">◆</span>
+                <span className="nav-label">
+                  <span>{p.name}</span>
+                  <span className="project-meta text-secondary">
+                    {p.board.split(":").pop()} · {p.component_count}
+                  </span>
+                </span>
+                <button
+                  className="sidebar-delete-btn"
+                  title="Delete project"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDelete(p.name);
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
@@ -196,6 +253,22 @@ export default function Sidebar({
           >
             <span className="nav-icon">+</span>
             <span className="nav-label">New Project</span>
+          </div>
+        )}
+
+        {/* Projects folder location */}
+        {projectsPath && (
+          <div className="sidebar-projects-path">
+            <span className="sidebar-path-text text-secondary" title={projectsPath}>
+              {projectsPath.replace(/\\/g, "/").split("/").slice(-2).join("/")}
+            </span>
+            <button
+              className="sidebar-reveal-btn"
+              title={`Open folder: ${projectsPath}`}
+              onClick={handleRevealProjects}
+            >
+              ⊙
+            </button>
           </div>
         )}
       </div>

@@ -26,6 +26,10 @@ export async function deleteProject(name: string): Promise<void> {
   return invoke("delete_project", { name });
 }
 
+export async function getProjectsPath(): Promise<string> {
+  return invoke<string>("get_projects_path");
+}
+
 export async function getActiveProject(): Promise<Project | null> {
   return invoke<Project | null>("get_active_project");
 }

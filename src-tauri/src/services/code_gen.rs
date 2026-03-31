@@ -193,6 +193,10 @@ Component pin reference:
 }
 
 fn build_chat_system_prompt(manifest: &Manifest, current_sketch: Option<&str>) -> String {
+    build_chat_system_prompt_pub(manifest, current_sketch)
+}
+
+pub fn build_chat_system_prompt_pub(manifest: &Manifest, current_sketch: Option<&str>) -> String {
     let base = build_system_prompt(manifest);
     let sketch_section = match current_sketch {
         Some(sketch) => format!(
@@ -298,13 +302,13 @@ fn extract_from_code_fence(response: &str) -> String {
     response.to_string()
 }
 
-fn has_sketch_code(response: &str) -> bool {
+pub fn has_sketch_code(response: &str) -> bool {
     let code = extract_code_block(response);
     // Check for typical Arduino code markers
     code.contains("void setup()") || code.contains("void loop()") || code.contains("Serial.")
 }
 
-fn extract_text_outside_code(response: &str) -> String {
+pub fn extract_text_outside_code(response: &str) -> String {
     let mut result = String::new();
     let mut in_code = false;
 

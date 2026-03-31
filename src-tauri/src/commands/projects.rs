@@ -142,6 +142,12 @@ pub fn delete_project(
 }
 
 #[tauri::command]
+pub fn get_projects_path() -> Result<String, String> {
+    let dir = projects_dir()?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub fn get_active_project(
     state: tauri::State<'_, AppState>,
 ) -> Result<Option<Project>, String> {

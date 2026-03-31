@@ -1,9 +1,14 @@
 use crate::models::tools::{GeneratedSketchResponse, SerialToolDefinition, ToolRegistry};
-use crate::services::code_gen::{save_sketch_version, CodeGenService};
-use crate::services::provider::{ChatMessage, MessageContent};
+use crate::services::code_gen::{
+    extract_code_block_pub as extract_code_block, extract_text_outside_code, has_sketch_code,
+    compute_diff, save_sketch_version, CodeGenService,
+};
+use crate::services::provider::{ChatMessage, CompletionRequest, MessageContent, StreamChunk};
 use crate::AppState;
 use std::fs;
 use std::sync::Mutex;
+use tauri::ipc::Channel;
+use tokio::sync::mpsc;
 
 pub struct ConversationState {
     pub history: Vec<ChatMessage>,
@@ -322,4 +327,106 @@ pub async fn clear_chat_history() -> Result<(), String> {
 pub struct ChatResponse {
     pub text: String,
     pub sketch: Option<GeneratedSketchResponse>,
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(tag = "type", content = "data")]
+pub enum ChatStreamEvent {
+    Token(String),
+    Complete(ChatResponse),
+    Error(String),
+}
+
+#[tauri::command]
+pub async fn stream_chat_message(
+    state: tauri::State<'_, AppState>,
+    message: String,
+    channel: Channel<ChatStreamEvent>,
+) -> Result<(), String> {
+    let (manifest, current_sketch) = {
+        let active = state
+            .active_project
+            .lock()
+            .map_err(|e| e.to_string())?;
+        let project = active.as_ref().ok_or("No active project")?;
+        (project.manifest.clone(), project.sketch.clone())
+    };
+
+    // Add user message to conversation history
+    {
+        let mut conv = CONVERSATION.lock().map_err(|e| e.to_string())?;
+        conv.history.push(ChatMessage {
+            role: "user".to_string(),
+            content: MessageContent::Text(message.clone()),
+        });
+    }
+
+    let provider = state.model_manager.code_model().await?;
+
+    let history = {
+        let conv = CONVERSATION.lock().map_err(|e| e.to_string())?;
+        conv.history.clone()
+    };
+
+    let system_prompt = {
+        use crate::services::code_gen::build_chat_system_prompt_pub;
+        build_chat_system_prompt_pub(&manifest, current_sketch.as_deref())
+    };
+
+    let request = CompletionRequest {
+        messages: history,
+        system_prompt: Some(system_prompt),
+        temperature: Some(0.3),
+        max_tokens: Some(4096),
+        tools: None,
+    };
+
+    let (tx, mut rx) = mpsc::channel::<StreamChunk>(128);
+
+    // Spawn task to forward stream chunks to channel
+    let chan = channel.clone();
+    let collector_handle = tokio::spawn(async move {
+        let mut full_text = String::new();
+        while let Some(chunk) = rx.recv().await {
+            if !chunk.content.is_empty() {
+                full_text.push_str(&chunk.content);
+                let _ = chan.send(ChatStreamEvent::Token(chunk.content));
+            }
+        }
+        full_text
+    });
+
+    // Run streaming provider
+    let stream_result = provider.complete_stream(request, tx).await;
+
+    // Wait for collector to finish accumulating
+    let full_text = collector_handle.await.unwrap_or_default();
+
+    if let Err(e) = stream_result {
+        let _ = channel.send(ChatStreamEvent::Error(e.clone()));
+        return Err(e);
+    }
+
+    // Parse text for sketch code block
+    let (text, sketch) = if full_text.contains("```") && has_sketch_code(&full_text) {
+        let new_sketch = extract_code_block(&full_text);
+        let diff = current_sketch.as_deref().map(|old| compute_diff(old, &new_sketch));
+        let text = extract_text_outside_code(&full_text);
+        (text, Some(GeneratedSketchResponse { code: new_sketch, diff }))
+    } else {
+        (full_text.clone(), None)
+    };
+
+    // Add assistant response to history
+    {
+        let mut conv = CONVERSATION.lock().map_err(|e| e.to_string())?;
+        conv.history.push(ChatMessage {
+            role: "assistant".to_string(),
+            content: MessageContent::Text(text.clone()),
+        });
+    }
+
+    let _ = channel.send(ChatStreamEvent::Complete(ChatResponse { text, sketch }));
+
+    Ok(())
 }

@@ -195,6 +195,12 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
     (m) => !multimodalOnly || m.multimodal,
   );
 
+  // Is the currently selected Ollama model NOT yet installed?
+  const isUninstalledOllamaModel =
+    provider === "ollama" &&
+    model !== "" &&
+    !installedIds.has(model);
+
   const handleSave = useCallback(async () => {
     if (!model) return;
     setSaving(true);
@@ -210,6 +216,9 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
       // Test health after save
       const ok = await checkModelHealth(slot);
       setHealth(ok ? "green" : "red");
+      if (!ok && provider === "ollama" && !installedIds.has(model)) {
+        setError(`"${model}" is not installed. Pull it in the Ollama Models section below, then test again.`);
+      }
       if (apiKey) {
         setHasKey(true);
         setApiKey("");
@@ -220,19 +229,25 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
     } finally {
       setSaving(false);
     }
-  }, [slot, provider, model, apiKey]);
+  }, [slot, provider, model, apiKey, installedIds]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
+    setError(null);
     try {
       const ok = await checkModelHealth(slot);
       setHealth(ok ? "green" : "red");
+      if (!ok && provider === "ollama" && !installedIds.has(model)) {
+        setError(`"${model}" is not installed. Pull it in the Ollama Models section below first.`);
+      } else if (!ok) {
+        setError("Model unreachable. Check that Ollama is running and the model name is correct.");
+      }
     } catch {
       setHealth("red");
     } finally {
       setTesting(false);
     }
-  }, [slot]);
+  }, [slot, provider, model, installedIds]);
 
   const requiresKey = providers.find((p) => p.id === provider)?.requires_key ?? false;
 
@@ -329,6 +344,12 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
         </div>
       )}
 
+      {isUninstalledOllamaModel && (
+        <div className="settings-warning">
+          ⬇ "{model}" is not yet installed. Save to configure the slot, then pull the model in the <strong>Ollama Models</strong> section below before using it.
+        </div>
+      )}
+
       {error && <div className="settings-error">{error}</div>}
 
       <div className="settings-card-actions">
@@ -342,7 +363,8 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
         <button
           className="settings-btn"
           onClick={handleTest}
-          disabled={testing}
+          disabled={testing || !model}
+          title={!model ? "Select a model first" : "Check if model is reachable"}
         >
           {testing ? "Testing…" : "Test"}
         </button>

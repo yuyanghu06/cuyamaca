@@ -146,7 +146,14 @@ export default function CodeView({
       const result = await generateSketch();
       onPendingSketch(result);
     } catch (err) {
-      setError(String(err));
+      const msg = String(err);
+      if (msg.toLowerCase().includes("not configured") || msg.toLowerCase().includes("no model")) {
+        setError("No code model configured. Go to Settings → Code Model and save a model first.");
+      } else if (msg.toLowerCase().includes("connection refused") || msg.toLowerCase().includes("connect")) {
+        setError("Cannot reach the model. Make sure Ollama is running (check sidebar status).");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

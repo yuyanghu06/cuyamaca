@@ -132,6 +132,7 @@ export default function ManifestView({ project, onProjectUpdated }: ManifestView
 
   const cancelEditing = () => {
     setEditingComponent(null);
+    setExpandedId(null);
   };
 
   const saveEditing = async () => {

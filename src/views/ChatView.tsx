@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { sendChatMessage, clearChatHistory } from "../commands/codegen";
+import { streamChatMessage, clearChatHistory } from "../commands/codegen";
 import type {
   Project,
   GeneratedSketchResponse,
-  ChatResponse,
 } from "../types/manifest";
 import GlassPanel from "../components/GlassPanel";
 
@@ -17,6 +16,7 @@ interface ChatBubble {
   role: "user" | "assistant";
   text: string;
   hasSketch?: boolean;
+  streaming?: boolean;
 }
 
 export default function ChatView({
@@ -51,25 +51,76 @@ export default function ChatView({
     setMessages((prev) => [...prev, { role: "user", text: msg }]);
     setLoading(true);
 
+    // Append a streaming placeholder bubble
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", text: "", streaming: true },
+    ]);
+
     try {
-      const response: ChatResponse = await sendChatMessage(msg);
-
-      const bubble: ChatBubble = {
-        role: "assistant",
-        text: response.text,
-        hasSketch: !!response.sketch,
-      };
-      setMessages((prev) => [...prev, bubble]);
-
-      if (response.sketch) {
-        onPendingSketch(response.sketch);
-      }
+      await streamChatMessage(msg, (event) => {
+        if (event.type === "Token") {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === "assistant" && last.streaming) {
+              updated[updated.length - 1] = {
+                ...last,
+                text: last.text + event.data,
+              };
+            }
+            return updated;
+          });
+        } else if (event.type === "Complete") {
+          const response = event.data;
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === "assistant") {
+              updated[updated.length - 1] = {
+                role: "assistant",
+                text: response.text || last.text,
+                hasSketch: !!response.sketch,
+                streaming: false,
+              };
+            }
+            return updated;
+          });
+          if (response.sketch) {
+            onPendingSketch(response.sketch);
+          }
+          setLoading(false);
+          inputRef.current?.focus();
+        } else if (event.type === "Error") {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last?.role === "assistant") {
+              updated[updated.length - 1] = {
+                role: "assistant",
+                text: `Error: ${event.data}`,
+                streaming: false,
+              };
+            }
+            return updated;
+          });
+          setLoading(false);
+          inputRef.current?.focus();
+        }
+      });
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: `Error: ${err}` },
-      ]);
-    } finally {
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant") {
+          updated[updated.length - 1] = {
+            role: "assistant",
+            text: `Error: ${err}`,
+            streaming: false,
+          };
+        }
+        return updated;
+      });
       setLoading(false);
       inputRef.current?.focus();
     }
@@ -118,7 +169,10 @@ export default function ChatView({
               tier={msg.role === "user" ? "strong" : "standard"}
               className={`chat-bubble-inner ${msg.role === "user" ? "chat-user-glass" : "chat-ai-glass"}`}
             >
-              <div className="chat-bubble-text">{msg.text}</div>
+              <div className="chat-bubble-text">
+                {msg.text}
+                {msg.streaming && <span className="chat-stream-cursor">▋</span>}
+              </div>
               {msg.hasSketch && (
                 <button
                   className="chat-review-btn"
@@ -131,7 +185,7 @@ export default function ChatView({
           </div>
         ))}
 
-        {loading && (
+        {loading && messages[messages.length - 1]?.streaming === false && (
           <div className="chat-bubble chat-bubble-ai">
             <GlassPanel tier="standard" className="chat-bubble-inner chat-ai-glass">
               <div className="chat-loading">

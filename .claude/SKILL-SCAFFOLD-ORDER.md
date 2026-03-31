@@ -13,3 +13,7 @@ Phase 6 — Serial + Sensors (526 lines): Serial connection with concurrent read
 Phase 7 — Runtime Agent (613 lines): The main event — runtime window, multimodal context assembly (text + sensor viz + camera), tool call dispatch via serial commands, the agentic observe-decide-act loop, chat with tool call pills, the Kill button with Escape shortcut.
 
 Phase 8 — Settings + Polish (416 lines): Settings view (model config, API keys, Ollama model pull, connections), accessibility (reduced transparency, focus indicators, ARIA, keyboard nav), responsive refinements, error/empty states, animation polish, toast notifications.
+
+Phase 9 - README 
+
+Phase 10 - Installer + wizard

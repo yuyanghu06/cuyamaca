@@ -3,12 +3,14 @@ mod models;
 mod services;
 
 use models::project::Project;
+use services::arduino::ArduinoService;
 use services::model_manager::ModelManager;
 use std::sync::Mutex;
 
 pub struct AppState {
     pub model_manager: ModelManager,
     pub active_project: Mutex<Option<Project>>,
+    pub arduino: ArduinoService,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,6 +18,7 @@ pub fn run() {
     let state = AppState {
         model_manager: ModelManager::new(),
         active_project: Mutex::new(None),
+        arduino: ArduinoService::new(),
     };
 
     tauri::Builder::default()
@@ -53,6 +56,10 @@ pub fn run() {
             commands::codegen::get_tools,
             commands::codegen::send_chat_message,
             commands::codegen::clear_chat_history,
+            commands::flash::detect_arduino_cli,
+            commands::flash::install_arduino_cli,
+            commands::flash::detect_boards,
+            commands::flash::flash_sketch,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

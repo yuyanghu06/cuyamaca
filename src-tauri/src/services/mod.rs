@@ -7,3 +7,4 @@ pub mod mistral;
 pub mod model_manager;
 pub mod keystore;
 pub mod code_gen;
+pub mod arduino;

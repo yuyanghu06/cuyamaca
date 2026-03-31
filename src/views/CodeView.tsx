@@ -5,12 +5,21 @@ import {
   approveSketch,
   rejectSketch,
 } from "../commands/codegen";
+import { flashSketch } from "../commands/flash";
 import type {
   Project,
   GeneratedSketchResponse,
   DiffLine,
+  FlashEvent,
 } from "../types/manifest";
 import GlassPanel from "../components/GlassPanel";
+
+type FlashStatus =
+  | { state: "idle" }
+  | { state: "compiling" }
+  | { state: "uploading" }
+  | { state: "succeeded"; binarySize: number; maxSize: number }
+  | { state: "failed"; error: string };
 
 interface CodeViewProps {
   project: Project | null;
@@ -126,6 +135,7 @@ export default function CodeView({
 }: CodeViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [flashStatus, setFlashStatus] = useState<FlashStatus>({ state: "idle" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerate = useCallback(async () => {
@@ -165,7 +175,51 @@ export default function CodeView({
     [onPendingSketch],
   );
 
-  const handleApprove = useCallback(async () => {
+  const handleApproveAndFlash = useCallback(async () => {
+    if (!pendingSketch) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await approveSketch(pendingSketch.code);
+      onPendingSketch(null);
+      onProjectUpdated();
+
+      // Start flash
+      setFlashStatus({ state: "compiling" });
+      await flashSketch((event: FlashEvent) => {
+        switch (event.event) {
+          case "compiling":
+            setFlashStatus({ state: "compiling" });
+            break;
+          case "uploading":
+            setFlashStatus({ state: "uploading" });
+            break;
+          case "succeeded":
+            setFlashStatus({
+              state: "succeeded",
+              binarySize: event.data.binary_size,
+              maxSize: event.data.max_size,
+            });
+            setTimeout(() => setFlashStatus({ state: "idle" }), 4000);
+            break;
+          case "failed":
+            setFlashStatus({ state: "failed", error: event.data.error });
+            break;
+        }
+      });
+    } catch (err) {
+      const msg = String(err);
+      if (flashStatus.state !== "idle") {
+        setFlashStatus({ state: "failed", error: msg });
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [pendingSketch, onPendingSketch, onProjectUpdated, flashStatus.state]);
+
+  const handleApproveOnly = useCallback(async () => {
     if (!pendingSketch) return;
     setLoading(true);
     setError(null);
@@ -179,6 +233,35 @@ export default function CodeView({
       setLoading(false);
     }
   }, [pendingSketch, onPendingSketch, onProjectUpdated]);
+
+  const handleFlashCurrent = useCallback(async () => {
+    setFlashStatus({ state: "compiling" });
+    try {
+      await flashSketch((event: FlashEvent) => {
+        switch (event.event) {
+          case "compiling":
+            setFlashStatus({ state: "compiling" });
+            break;
+          case "uploading":
+            setFlashStatus({ state: "uploading" });
+            break;
+          case "succeeded":
+            setFlashStatus({
+              state: "succeeded",
+              binarySize: event.data.binary_size,
+              maxSize: event.data.max_size,
+            });
+            setTimeout(() => setFlashStatus({ state: "idle" }), 4000);
+            break;
+          case "failed":
+            setFlashStatus({ state: "failed", error: event.data.error });
+            break;
+        }
+      });
+    } catch (err) {
+      setFlashStatus({ state: "failed", error: String(err) });
+    }
+  }, []);
 
   const handleReject = useCallback(async () => {
     try {
@@ -250,6 +333,76 @@ export default function CodeView({
 
   return (
     <div className="code-view">
+      {/* Flash progress overlay */}
+      {flashStatus.state !== "idle" && (
+        <div className="flash-overlay">
+          <GlassPanel tier="strong" className="flash-modal">
+            {flashStatus.state === "compiling" && (
+              <>
+                <div className="flash-icon flash-icon-amber">◉</div>
+                <div className="flash-status">Compiling sketch…</div>
+                <div className="flash-bar">
+                  <div className="flash-bar-fill flash-bar-pulse" />
+                </div>
+                <div className="flash-detail">
+                  Board: {project?.manifest.board}<br />
+                  Port: {project?.manifest.serial_port}
+                </div>
+              </>
+            )}
+            {flashStatus.state === "uploading" && (
+              <>
+                <div className="flash-icon flash-icon-cyan">◉</div>
+                <div className="flash-status">Uploading to board…</div>
+                <div className="flash-bar">
+                  <div className="flash-bar-fill flash-bar-pulse flash-bar-cyan" />
+                </div>
+                <div className="flash-detail">
+                  Port: {project?.manifest.serial_port}
+                </div>
+              </>
+            )}
+            {flashStatus.state === "succeeded" && (
+              <>
+                <div className="flash-icon flash-icon-green">✓</div>
+                <div className="flash-status">Flashed successfully</div>
+                {flashStatus.binarySize > 0 && (
+                  <div className="flash-detail">
+                    {flashStatus.binarySize} bytes
+                    {flashStatus.maxSize > 0 &&
+                      ` (${Math.round((flashStatus.binarySize / flashStatus.maxSize) * 100)}% of ${flashStatus.maxSize})`}
+                  </div>
+                )}
+              </>
+            )}
+            {flashStatus.state === "failed" && (
+              <>
+                <div className="flash-icon flash-icon-red">✕</div>
+                <div className="flash-status">Flash failed</div>
+                <pre className="flash-error">{flashStatus.error}</pre>
+                <div className="flash-actions">
+                  <button
+                    className="code-generate-btn"
+                    onClick={() => {
+                      setFlashStatus({ state: "idle" });
+                      handleFlashCurrent();
+                    }}
+                  >
+                    Try Again
+                  </button>
+                  <button
+                    className="code-upload-btn"
+                    onClick={() => setFlashStatus({ state: "idle" })}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </>
+            )}
+          </GlassPanel>
+        </div>
+      )}
+
       {/* Approve/Reject bar */}
       {hasPending && (
         <div className="code-action-bar">
@@ -258,11 +411,18 @@ export default function CodeView({
           </div>
           <div className="code-action-buttons">
             <button
-              className="code-approve-btn"
-              onClick={handleApprove}
+              className="code-approve-btn code-flash-btn"
+              onClick={handleApproveAndFlash}
               disabled={loading}
             >
-              {loading ? "Saving…" : "Approve & Save"}
+              {loading ? "Flashing…" : "Approve & Flash"}
+            </button>
+            <button
+              className="code-approve-btn"
+              onClick={handleApproveOnly}
+              disabled={loading}
+            >
+              Save Only
             </button>
             <button
               className="code-reject-btn"
@@ -286,9 +446,16 @@ export default function CodeView({
         </GlassPanel>
       </div>
 
-      {/* Upload button for existing sketches */}
+      {/* Footer actions for existing sketches */}
       {!hasPending && (
         <div className="code-footer-actions">
+          <button
+            className="code-generate-btn code-small-btn code-flash-btn"
+            onClick={handleFlashCurrent}
+            disabled={loading || flashStatus.state !== "idle"}
+          >
+            ⚡ Flash
+          </button>
           <button
             className="code-generate-btn code-small-btn"
             onClick={handleGenerate}

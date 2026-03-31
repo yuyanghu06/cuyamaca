@@ -74,3 +74,16 @@ export interface ChatResponse {
   text: string;
   sketch: GeneratedSketchResponse | null;
 }
+
+export interface DetectedBoard {
+  port: string;
+  fqbn: string | null;
+  board_name: string | null;
+  protocol: string;
+}
+
+export type FlashEvent =
+  | { event: "compiling" }
+  | { event: "uploading" }
+  | { event: "succeeded"; data: { binary_size: number; max_size: number } }
+  | { event: "failed"; data: { error: string } };

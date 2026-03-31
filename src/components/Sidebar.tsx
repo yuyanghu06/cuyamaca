@@ -9,6 +9,7 @@ import {
   createProject,
   openProject,
 } from "../commands/projects";
+import { detectArduinoCli } from "../commands/flash";
 import type { ProjectSummary, Project } from "../types/manifest";
 
 type NavView = "manifest" | "code" | "chat";
@@ -35,6 +36,7 @@ export default function Sidebar({
   onProjectOpened,
 }: SidebarProps) {
   const [ollamaStatus, setOllamaStatus] = useState<HealthStatus>("red");
+  const [arduinoCliStatus, setArduinoCliStatus] = useState<HealthStatus>("red");
   const [codeModelStatus, setCodeModelStatus] = useState<HealthStatus>("red");
   const [runtimeModelStatus, setRuntimeModelStatus] = useState<HealthStatus>("red");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -57,6 +59,13 @@ export default function Sidebar({
       setOllamaStatus(ollamaOk ? "green" : "red");
     } catch {
       setOllamaStatus("red");
+    }
+
+    try {
+      const cliOk = await detectArduinoCli();
+      setArduinoCliStatus(cliOk ? "green" : "red");
+    } catch {
+      setArduinoCliStatus("red");
     }
 
     try {
@@ -112,7 +121,7 @@ export default function Sidebar({
 
   const healthItems: { label: string; status: HealthStatus }[] = [
     { label: "Ollama", status: ollamaStatus },
-    { label: "arduino-cli", status: "red" },
+    { label: "arduino-cli", status: arduinoCliStatus },
     { label: "Code Model", status: codeModelStatus },
     { label: "Runtime Model", status: runtimeModelStatus },
   ];

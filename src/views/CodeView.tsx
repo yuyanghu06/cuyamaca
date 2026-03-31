@@ -1,11 +1,361 @@
-export default function CodeView() {
-  return (
-    <div className="view-placeholder">
-      <div className="view-placeholder-title">Code</div>
-      <div className="view-placeholder-subtitle">
-        View and approve Arduino sketches. The code model generates and modifies sketches from
-        your manifest — every change shown as a highlighted diff before flashing.
+import React, { useState, useRef, useCallback } from "react";
+import {
+  generateSketch,
+  uploadSketch,
+  approveSketch,
+  rejectSketch,
+} from "../commands/codegen";
+import type {
+  Project,
+  GeneratedSketchResponse,
+  DiffLine,
+} from "../types/manifest";
+import GlassPanel from "../components/GlassPanel";
+
+interface CodeViewProps {
+  project: Project | null;
+  onProjectUpdated: () => void;
+  pendingSketch: GeneratedSketchResponse | null;
+  onPendingSketch: (sketch: GeneratedSketchResponse | null) => void;
+}
+
+const KEYWORDS = new Set([
+  "void", "int", "long", "unsigned", "float", "double", "char", "bool",
+  "boolean", "byte", "short", "const", "static", "volatile", "extern",
+  "if", "else", "for", "while", "do", "switch", "case", "break",
+  "continue", "return", "default", "struct", "class", "enum", "typedef",
+  "sizeof", "true", "false", "HIGH", "LOW", "INPUT", "OUTPUT",
+  "INPUT_PULLUP", "LED_BUILTIN", "Serial", "String", "NULL", "nullptr",
+]);
+
+function highlightLine(text: string): React.JSX.Element[] {
+  const tokens: React.JSX.Element[] = [];
+  let i = 0;
+
+  while (i < text.length) {
+    // Comments
+    if (text.slice(i, i + 2) === "//") {
+      tokens.push(
+        <span key={i} className="hl-comment">
+          {text.slice(i)}
+        </span>,
+      );
+      break;
+    }
+
+    // Preprocessor
+    if (i === 0 && text.trimStart().startsWith("#")) {
+      tokens.push(
+        <span key={i} className="hl-preproc">
+          {text}
+        </span>,
+      );
+      break;
+    }
+
+    // Strings
+    if (text[i] === '"') {
+      const end = text.indexOf('"', i + 1);
+      const strEnd = end === -1 ? text.length : end + 1;
+      tokens.push(
+        <span key={i} className="hl-string">
+          {text.slice(i, strEnd)}
+        </span>,
+      );
+      i = strEnd;
+      continue;
+    }
+
+    // Single-char literals
+    if (text[i] === "'") {
+      const end = text.indexOf("'", i + 1);
+      const strEnd = end === -1 ? text.length : end + 1;
+      tokens.push(
+        <span key={i} className="hl-string">
+          {text.slice(i, strEnd)}
+        </span>,
+      );
+      i = strEnd;
+      continue;
+    }
+
+    // Numbers
+    if (/\d/.test(text[i]) && (i === 0 || /[\s,;(=+\-*/<>!&|^~%]/.test(text[i - 1]))) {
+      let j = i;
+      while (j < text.length && /[\d.xXaAbBcCdDeEfFuUlL]/.test(text[j])) j++;
+      tokens.push(
+        <span key={i} className="hl-number">
+          {text.slice(i, j)}
+        </span>,
+      );
+      i = j;
+      continue;
+    }
+
+    // Identifiers / keywords
+    if (/[a-zA-Z_]/.test(text[i])) {
+      let j = i;
+      while (j < text.length && /[a-zA-Z0-9_]/.test(text[j])) j++;
+      const word = text.slice(i, j);
+      if (KEYWORDS.has(word)) {
+        tokens.push(
+          <span key={i} className="hl-keyword">
+            {word}
+          </span>,
+        );
+      } else {
+        tokens.push(<span key={i}>{word}</span>);
+      }
+      i = j;
+      continue;
+    }
+
+    // Plain char
+    tokens.push(<span key={i}>{text[i]}</span>);
+    i++;
+  }
+
+  return tokens;
+}
+
+export default function CodeView({
+  project,
+  onProjectUpdated,
+  pendingSketch,
+  onPendingSketch,
+}: CodeViewProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGenerate = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await generateSketch();
+      onPendingSketch(result);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [onPendingSketch]);
+
+  const handleUpload = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const content = await file.text();
+        const result = await uploadSketch(content);
+        onPendingSketch(result);
+      } catch (err) {
+        setError(String(err));
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [onPendingSketch],
+  );
+
+  const handleApprove = useCallback(async () => {
+    if (!pendingSketch) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await approveSketch(pendingSketch.code);
+      onPendingSketch(null);
+      onProjectUpdated();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [pendingSketch, onPendingSketch, onProjectUpdated]);
+
+  const handleReject = useCallback(async () => {
+    try {
+      await rejectSketch();
+    } catch {
+      // ignore
+    }
+    onPendingSketch(null);
+  }, [onPendingSketch]);
+
+  if (!project) {
+    return (
+      <div className="view-placeholder">
+        <div className="view-placeholder-title">Code</div>
+        <div className="view-placeholder-subtitle">
+          Open a project to view and manage Arduino sketches.
+        </div>
       </div>
+    );
+  }
+
+  const currentSketch = project.sketch;
+  const hasSketch = !!currentSketch;
+  const hasPending = !!pendingSketch;
+
+  // Determine what to display
+  const displayCode = hasPending ? pendingSketch.code : currentSketch;
+  const diffLines = hasPending ? pendingSketch.diff : null;
+
+  // Empty state
+  if (!hasSketch && !hasPending) {
+    return (
+      <div className="code-view">
+        <div className="code-empty">
+          <GlassPanel tier="standard" className="code-empty-card">
+            <div className="code-empty-title">No Sketch Yet</div>
+            <div className="code-empty-desc">
+              Generate a sketch from your manifest or upload your own .ino file.
+            </div>
+            {error && <div className="code-error">{error}</div>}
+            <div className="code-empty-actions">
+              <button
+                className="code-generate-btn"
+                onClick={handleGenerate}
+                disabled={loading}
+              >
+                {loading ? "Generating…" : "Generate from Manifest"}
+              </button>
+              <button
+                className="code-upload-btn"
+                onClick={handleUpload}
+                disabled={loading}
+              >
+                Upload .ino
+              </button>
+            </div>
+          </GlassPanel>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".ino,.cpp,.c"
+          style={{ display: "none" }}
+          onChange={handleFileSelected}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="code-view">
+      {/* Approve/Reject bar */}
+      {hasPending && (
+        <div className="code-action-bar">
+          <div className="code-action-label">
+            {diffLines ? "Review changes" : "New sketch generated"}
+          </div>
+          <div className="code-action-buttons">
+            <button
+              className="code-approve-btn"
+              onClick={handleApprove}
+              disabled={loading}
+            >
+              {loading ? "Saving…" : "Approve & Save"}
+            </button>
+            <button
+              className="code-reject-btn"
+              onClick={handleReject}
+              disabled={loading}
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <div className="code-error">{error}</div>}
+
+      {/* Code display */}
+      <div className="code-scroll">
+        <GlassPanel tier="subtle" className="code-block">
+          {diffLines
+            ? renderDiffView(diffLines)
+            : renderPlainView(displayCode || "")}
+        </GlassPanel>
+      </div>
+
+      {/* Upload button for existing sketches */}
+      {!hasPending && (
+        <div className="code-footer-actions">
+          <button
+            className="code-generate-btn code-small-btn"
+            onClick={handleGenerate}
+            disabled={loading}
+          >
+            {loading ? "Generating…" : "Regenerate"}
+          </button>
+          <button
+            className="code-upload-btn code-small-btn"
+            onClick={handleUpload}
+            disabled={loading}
+          >
+            Upload .ino
+          </button>
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".ino,.cpp,.c"
+        style={{ display: "none" }}
+        onChange={handleFileSelected}
+      />
     </div>
+  );
+}
+
+function renderPlainView(code: string) {
+  const lines = code.split("\n");
+  return (
+    <pre className="code-lines">
+      {lines.map((line, idx) => (
+        <div key={idx} className="code-line">
+          <span className="code-line-num">{idx + 1}</span>
+          <span className="code-line-content">{highlightLine(line)}</span>
+        </div>
+      ))}
+    </pre>
+  );
+}
+
+function renderDiffView(diff: DiffLine[]) {
+  return (
+    <pre className="code-lines">
+      {diff.map((line, idx) => {
+        const statusClass =
+          line.status === "added"
+            ? "code-line-added"
+            : line.status === "removed"
+              ? "code-line-removed"
+              : "";
+        const marker =
+          line.status === "added"
+            ? "+"
+            : line.status === "removed"
+              ? "−"
+              : " ";
+
+        return (
+          <div key={idx} className={`code-line ${statusClass}`}>
+            <span className="code-line-marker">{marker}</span>
+            <span className="code-line-num">{line.line_number}</span>
+            <span className="code-line-content">{highlightLine(line.content)}</span>
+          </div>
+        );
+      })}
+    </pre>
   );
 }

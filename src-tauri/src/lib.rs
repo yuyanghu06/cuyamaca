@@ -44,6 +44,15 @@ pub fn run() {
             commands::projects::remove_component,
             commands::projects::list_serial_ports,
             commands::projects::get_component_library,
+            commands::codegen::generate_sketch,
+            commands::codegen::modify_sketch,
+            commands::codegen::approve_sketch,
+            commands::codegen::reject_sketch,
+            commands::codegen::upload_sketch,
+            commands::codegen::get_sketch,
+            commands::codegen::get_tools,
+            commands::codegen::send_chat_message,
+            commands::codegen::clear_chat_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

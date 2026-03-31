@@ -25,4 +25,5 @@ async-trait = "0.1"
 keyring = "3"
 serialport = "4"
 dirs = "6"
+similar = "2"
 

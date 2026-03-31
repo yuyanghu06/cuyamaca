@@ -5,7 +5,7 @@ import ManifestView from "./views/ManifestView";
 import CodeView from "./views/CodeView";
 import ChatView from "./views/ChatView";
 import { openProject } from "./commands/projects";
-import type { Project } from "./types/manifest";
+import type { Project, GeneratedSketchResponse } from "./types/manifest";
 import "./styles/globals.css";
 
 type NavView = "manifest" | "code" | "chat";
@@ -14,6 +14,7 @@ function App() {
   const [activeView, setActiveView] = useState<NavView>("manifest");
   const [partsPanelCollapsed, setPartsPanelCollapsed] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [pendingSketch, setPendingSketch] = useState<GeneratedSketchResponse | null>(null);
 
   const refreshActiveProject = useCallback(async () => {
     if (!activeProject) return;
@@ -25,6 +26,16 @@ function App() {
     }
   }, [activeProject]);
 
+  const handlePendingSketch = useCallback(
+    (sketch: GeneratedSketchResponse | null) => {
+      setPendingSketch(sketch);
+      if (sketch) {
+        setActiveView("code");
+      }
+    },
+    [],
+  );
+
   const renderView = () => {
     switch (activeView) {
       case "manifest":
@@ -35,9 +46,22 @@ function App() {
           />
         );
       case "code":
-        return <CodeView />;
+        return (
+          <CodeView
+            project={activeProject}
+            onProjectUpdated={refreshActiveProject}
+            pendingSketch={pendingSketch}
+            onPendingSketch={setPendingSketch}
+          />
+        );
       case "chat":
-        return <ChatView />;
+        return (
+          <ChatView
+            project={activeProject}
+            onPendingSketch={handlePendingSketch}
+            onSwitchToCode={() => setActiveView("code")}
+          />
+        );
     }
   };
 

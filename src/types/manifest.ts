@@ -44,3 +44,33 @@ export interface ComponentTemplate {
   optional_fields: string[];
   serial_output: string | null;
 }
+
+export interface DiffLine {
+  line_number: number;
+  content: string;
+  status: "added" | "removed" | "unchanged";
+}
+
+export interface GeneratedSketchResponse {
+  code: string;
+  diff: DiffLine[] | null;
+}
+
+export interface SerialToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, ToolParameter>;
+  serial_command: string;
+}
+
+export interface ToolParameter {
+  type: string;
+  range?: string;
+  default?: unknown;
+  required: boolean;
+}
+
+export interface ChatResponse {
+  text: string;
+  sketch: GeneratedSketchResponse | null;
+}

@@ -443,3 +443,164 @@ fn parse_compile_output(output: &str) -> CompileResult {
         max_size,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_core_from_fqbn ──
+
+    #[test]
+    fn test_extract_core_arduino_avr() {
+        assert_eq!(
+            extract_core_from_fqbn("arduino:avr:uno").unwrap(),
+            "arduino:avr"
+        );
+    }
+
+    #[test]
+    fn test_extract_core_esp32() {
+        assert_eq!(
+            extract_core_from_fqbn("esp32:esp32:esp32-wroom-32").unwrap(),
+            "esp32:esp32"
+        );
+    }
+
+    #[test]
+    fn test_extract_core_two_parts() {
+        assert_eq!(
+            extract_core_from_fqbn("arduino:samd").unwrap(),
+            "arduino:samd"
+        );
+    }
+
+    #[test]
+    fn test_extract_core_invalid() {
+        assert!(extract_core_from_fqbn("invalid").is_err());
+    }
+
+    // ── core_is_installed ──
+
+    #[test]
+    fn test_core_installed_array_format() {
+        let json = r#"[{"id": "arduino:avr", "installed": "1.8.6"}]"#;
+        assert!(core_is_installed(json, "arduino:avr"));
+    }
+
+    #[test]
+    fn test_core_installed_object_format() {
+        let json = r#"{"platforms": [{"id": "arduino:avr", "installed": "1.8.6"}]}"#;
+        assert!(core_is_installed(json, "arduino:avr"));
+    }
+
+    #[test]
+    fn test_core_not_installed() {
+        let json = r#"[{"id": "arduino:avr"}]"#;
+        assert!(!core_is_installed(json, "esp32:esp32"));
+    }
+
+    #[test]
+    fn test_core_installed_empty_json() {
+        assert!(!core_is_installed("[]", "arduino:avr"));
+    }
+
+    #[test]
+    fn test_core_installed_invalid_json() {
+        assert!(!core_is_installed("not json", "arduino:avr"));
+    }
+
+    // ── parse_board_list ──
+
+    #[test]
+    fn test_parse_board_list_detected_ports() {
+        let json = r#"{
+            "detected_ports": [
+                {
+                    "port": {"address": "/dev/cu.usbmodem14201", "protocol": "serial"},
+                    "matching_boards": [{"fqbn": "arduino:avr:uno", "name": "Arduino Uno"}]
+                }
+            ]
+        }"#;
+        let boards = parse_board_list(json).unwrap();
+        assert_eq!(boards.len(), 1);
+        assert_eq!(boards[0].port, "/dev/cu.usbmodem14201");
+        assert_eq!(boards[0].fqbn, Some("arduino:avr:uno".into()));
+        assert_eq!(boards[0].board_name, Some("Arduino Uno".into()));
+    }
+
+    #[test]
+    fn test_parse_board_list_array_format() {
+        let json = r#"[
+            {
+                "port": {"address": "COM3", "protocol": "serial"},
+                "matching_boards": [{"fqbn": "arduino:avr:mega", "name": "Arduino Mega"}]
+            }
+        ]"#;
+        let boards = parse_board_list(json).unwrap();
+        assert_eq!(boards.len(), 1);
+        assert_eq!(boards[0].port, "COM3");
+    }
+
+    #[test]
+    fn test_parse_board_list_filters_non_serial() {
+        let json = r#"[
+            {
+                "port": {"address": "/dev/ttyUSB0", "protocol": "serial"},
+                "matching_boards": []
+            },
+            {
+                "port": {"address": "192.168.1.1", "protocol": "network"},
+                "matching_boards": []
+            }
+        ]"#;
+        let boards = parse_board_list(json).unwrap();
+        assert_eq!(boards.len(), 1);
+        assert_eq!(boards[0].port, "/dev/ttyUSB0");
+    }
+
+    #[test]
+    fn test_parse_board_list_empty() {
+        let boards = parse_board_list("[]").unwrap();
+        assert!(boards.is_empty());
+    }
+
+    #[test]
+    fn test_parse_board_list_no_matching_boards() {
+        let json = r#"[
+            {
+                "port": {"address": "/dev/ttyACM0", "protocol": "serial"},
+                "matching_boards": []
+            }
+        ]"#;
+        let boards = parse_board_list(json).unwrap();
+        assert_eq!(boards.len(), 1);
+        assert!(boards[0].fqbn.is_none());
+        assert!(boards[0].board_name.is_none());
+    }
+
+    // ── parse_compile_output ──
+
+    #[test]
+    fn test_parse_compile_standard() {
+        let output = "Sketch uses 3464 bytes (10%) of program storage space. Maximum is 32256 bytes.";
+        let result = parse_compile_output(output);
+        assert_eq!(result.binary_size, 3464);
+        assert_eq!(result.max_size, 32256);
+    }
+
+    #[test]
+    fn test_parse_compile_multiline() {
+        let output = "Compiling core...\nLinking everything together...\nSketch uses 9842 bytes (30%) of program storage space. Maximum is 32256 bytes.\nGlobal variables use 342 bytes.";
+        let result = parse_compile_output(output);
+        assert_eq!(result.binary_size, 9842);
+        assert_eq!(result.max_size, 32256);
+    }
+
+    #[test]
+    fn test_parse_compile_no_size_info() {
+        let output = "Compiling sketch...\nDone.";
+        let result = parse_compile_output(output);
+        assert_eq!(result.binary_size, 0);
+        assert_eq!(result.max_size, 0);
+    }
+}

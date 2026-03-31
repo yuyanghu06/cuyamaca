@@ -1,8 +1,10 @@
 use crate::services::dependency::{
     self, DependencyStatus, InstallEvent,
 };
+use crate::services::process_manager::ProcessState;
+use crate::AppState;
 use tauri::ipc::Channel;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
 
 #[tauri::command]
@@ -65,6 +67,33 @@ pub async fn is_setup_complete(app: AppHandle) -> Result<bool, String> {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     Ok(complete)
+}
+
+#[tauri::command]
+pub async fn start_ollama(state: State<'_, AppState>) -> Result<(), String> {
+    state.process_manager.start_ollama().await
+}
+
+#[tauri::command]
+pub async fn stop_ollama(state: State<'_, AppState>) -> Result<(), String> {
+    state.process_manager.stop_ollama().await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn restart_ollama(state: State<'_, AppState>) -> Result<(), String> {
+    state.process_manager.restart_ollama().await
+}
+
+#[tauri::command]
+pub async fn get_ollama_process_state(state: State<'_, AppState>) -> Result<String, String> {
+    let ps = state.process_manager.get_state().await;
+    Ok(match ps {
+        ProcessState::Stopped => "stopped".to_string(),
+        ProcessState::Starting => "starting".to_string(),
+        ProcessState::Running => "running".to_string(),
+        ProcessState::Failed(reason) => format!("failed: {}", reason),
+    })
 }
 
 fn get_app_data_dir() -> Result<std::path::PathBuf, String> {

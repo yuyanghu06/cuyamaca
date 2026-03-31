@@ -188,3 +188,25 @@ async fn find_ollama_binary() -> Option<String> {
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_process_manager_new_defaults() {
+        let pm = ProcessManager::new();
+        let state = pm.get_state().await;
+        assert_eq!(state, ProcessState::Stopped);
+    }
+
+    #[tokio::test]
+    async fn test_process_state_variants() {
+        assert_eq!(ProcessState::Stopped, ProcessState::Stopped);
+        assert_ne!(ProcessState::Stopped, ProcessState::Running);
+        assert_eq!(
+            ProcessState::Failed("error".into()),
+            ProcessState::Failed("error".into())
+        );
+    }
+}

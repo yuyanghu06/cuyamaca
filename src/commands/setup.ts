@@ -42,3 +42,19 @@ export async function markSetupComplete(): Promise<void> {
 export async function isSetupComplete(): Promise<boolean> {
   return invoke("is_setup_complete");
 }
+
+export async function startOllama(): Promise<void> {
+  return invoke("start_ollama");
+}
+
+export async function stopOllama(): Promise<void> {
+  return invoke("stop_ollama");
+}
+
+export async function restartOllama(): Promise<void> {
+  return invoke("restart_ollama");
+}
+
+export async function getOllamaProcessState(): Promise<string> {
+  return invoke("get_ollama_process_state");
+}

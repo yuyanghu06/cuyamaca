@@ -13,6 +13,7 @@ import {
   deleteOllamaModel,
 } from "../commands/models";
 import { detectArduinoCli } from "../commands/flash";
+import { restartOllama } from "../commands/setup";
 import type {
   ProviderInfo,
   ModelInfo,
@@ -411,11 +412,28 @@ function OllamaModelsSection() {
 function ConnectionsSection() {
   const [ollamaOk, setOllamaOk] = useState(false);
   const [arduinoOk, setArduinoOk] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
-  useEffect(() => {
+  const refreshHealth = useCallback(async () => {
     checkOllamaHealth().then(setOllamaOk).catch(() => setOllamaOk(false));
     detectArduinoCli().then(setArduinoOk).catch(() => setArduinoOk(false));
   }, []);
+
+  useEffect(() => {
+    refreshHealth();
+  }, [refreshHealth]);
+
+  const handleRestartOllama = useCallback(async () => {
+    setRestarting(true);
+    try {
+      await restartOllama();
+      await refreshHealth();
+    } catch (err) {
+      console.error("Restart failed:", err);
+    } finally {
+      setRestarting(false);
+    }
+  }, [refreshHealth]);
 
   return (
     <section className="settings-section">
@@ -429,6 +447,14 @@ function ConnectionsSection() {
               {ollamaOk ? "Running on localhost:11434" : "Not running"}
             </span>
           </div>
+          <button
+            className="settings-btn"
+            onClick={handleRestartOllama}
+            disabled={restarting}
+            style={{ marginLeft: "auto" }}
+          >
+            {restarting ? "Restarting…" : "Restart"}
+          </button>
         </div>
         <div className="settings-connection-row">
           <StatusDot status={arduinoOk ? "green" : "red"} />

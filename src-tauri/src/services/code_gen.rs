@@ -383,3 +383,154 @@ pub fn save_sketch_version(project_path: &std::path::Path, sketch: &str) -> Resu
 
     Ok(version)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── extract_code_block_pub ──
+
+    #[test]
+    fn test_extract_cpp_code_block() {
+        let input = "Here is your code:\n```cpp\nvoid setup() {}\nvoid loop() {}\n```\nDone.";
+        assert_eq!(
+            extract_code_block_pub(input),
+            "void setup() {}\nvoid loop() {}"
+        );
+    }
+
+    #[test]
+    fn test_extract_arduino_code_block() {
+        let input = "```arduino\nSerial.begin(9600);\n```";
+        assert_eq!(extract_code_block_pub(input), "Serial.begin(9600);");
+    }
+
+    #[test]
+    fn test_extract_ino_code_block() {
+        let input = "```ino\nint x = 5;\n```";
+        assert_eq!(extract_code_block_pub(input), "int x = 5;");
+    }
+
+    #[test]
+    fn test_extract_plain_code_block() {
+        let input = "```\nplain code\n```";
+        assert_eq!(extract_code_block_pub(input), "plain code");
+    }
+
+    #[test]
+    fn test_extract_no_fence_returns_entire() {
+        let input = "void setup() { }";
+        assert_eq!(extract_code_block_pub(input), "void setup() { }");
+    }
+
+    // ── extract_json_array ──
+
+    #[test]
+    fn test_extract_json_array_from_fence() {
+        let input = "```json\n[{\"name\": \"stop\"}]\n```";
+        let result = extract_json_array(input);
+        assert_eq!(result, "[{\"name\": \"stop\"}]");
+    }
+
+    #[test]
+    fn test_extract_json_array_nested() {
+        let input = "[{\"params\": [{\"type\": \"int\"}]}]";
+        let result = extract_json_array(input);
+        assert_eq!(result, "[{\"params\": [{\"type\": \"int\"}]}]");
+    }
+
+    #[test]
+    fn test_extract_json_array_with_surrounding_text() {
+        let input = "Here are the tools:\n[{\"name\": \"move\"}]\nThat's all.";
+        let result = extract_json_array(input);
+        assert_eq!(result, "[{\"name\": \"move\"}]");
+    }
+
+    // ── has_sketch_code ──
+
+    #[test]
+    fn test_has_sketch_code_with_setup() {
+        assert!(has_sketch_code("```cpp\nvoid setup() { }\n```"));
+    }
+
+    #[test]
+    fn test_has_sketch_code_with_loop() {
+        assert!(has_sketch_code("```cpp\nvoid loop() { }\n```"));
+    }
+
+    #[test]
+    fn test_has_sketch_code_with_serial() {
+        assert!(has_sketch_code("```cpp\nSerial.begin(9600);\n```"));
+    }
+
+    #[test]
+    fn test_no_sketch_code_plain_text() {
+        assert!(!has_sketch_code("This is just a description."));
+    }
+
+    // ── extract_text_outside_code ──
+
+    #[test]
+    fn test_extract_text_outside_code() {
+        let input = "Before\n```\ncode here\n```\nAfter";
+        assert_eq!(extract_text_outside_code(input), "Before\nAfter");
+    }
+
+    #[test]
+    fn test_extract_text_only_text() {
+        let input = "Just text";
+        assert_eq!(extract_text_outside_code(input), "Just text");
+    }
+
+    #[test]
+    fn test_extract_text_between_blocks() {
+        let input = "```\nblock1\n```\nMiddle\n```\nblock2\n```";
+        assert_eq!(extract_text_outside_code(input), "Middle");
+    }
+
+    // ── compute_diff ──
+
+    #[test]
+    fn test_diff_identical() {
+        let lines = compute_diff("a\nb\nc\n", "a\nb\nc\n");
+        assert!(lines.iter().all(|l| l.status == DiffStatus::Unchanged));
+        assert_eq!(lines.len(), 3);
+    }
+
+    #[test]
+    fn test_diff_all_added() {
+        let lines = compute_diff("", "a\nb\n");
+        assert!(lines.iter().all(|l| l.status == DiffStatus::Added));
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn test_diff_all_removed() {
+        let lines = compute_diff("a\nb\n", "");
+        assert!(lines.iter().all(|l| l.status == DiffStatus::Removed));
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn test_diff_mixed_changes() {
+        let old = "line1\nline2\nline3\n";
+        let new = "line1\nmodified\nline3\n";
+        let lines = compute_diff(old, new);
+        // line1 unchanged, line2 removed, modified added, line3 unchanged
+        let added = lines.iter().filter(|l| l.status == DiffStatus::Added).count();
+        let removed = lines.iter().filter(|l| l.status == DiffStatus::Removed).count();
+        let unchanged = lines.iter().filter(|l| l.status == DiffStatus::Unchanged).count();
+        assert!(added >= 1);
+        assert!(removed >= 1);
+        assert!(unchanged >= 1);
+    }
+
+    #[test]
+    fn test_diff_content_correct() {
+        let old = "hello\n";
+        let new = "hello\nworld\n";
+        let lines = compute_diff(old, new);
+        let added_line = lines.iter().find(|l| l.status == DiffStatus::Added).unwrap();
+        assert_eq!(added_line.content, "world");
+    }
+}

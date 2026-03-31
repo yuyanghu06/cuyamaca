@@ -86,6 +86,10 @@ pub fn run() {
             commands::setup::skip_dependency_setup,
             commands::setup::mark_setup_complete,
             commands::setup::is_setup_complete,
+            commands::setup::start_ollama,
+            commands::setup::stop_ollama,
+            commands::setup::restart_ollama,
+            commands::setup::get_ollama_process_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

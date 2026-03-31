@@ -224,3 +224,59 @@ impl ModelProvider for OllamaProvider {
         is_multimodal_model(&self.model)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_multimodal_llava() {
+        assert!(is_multimodal_model("llava"));
+        assert!(is_multimodal_model("llava:7b"));
+        assert!(is_multimodal_model("llava:13b-v1.6"));
+        assert!(is_multimodal_model("llava-llama3"));
+    }
+
+    #[test]
+    fn test_multimodal_bakllava() {
+        assert!(is_multimodal_model("bakllava"));
+        assert!(is_multimodal_model("bakllava:7b"));
+    }
+
+    #[test]
+    fn test_multimodal_moondream() {
+        assert!(is_multimodal_model("moondream"));
+        assert!(is_multimodal_model("moondream2:latest"));
+    }
+
+    #[test]
+    fn test_multimodal_llama_vision() {
+        assert!(is_multimodal_model("llama3.2-vision"));
+        assert!(is_multimodal_model("llama3.2-vision:11b"));
+        assert!(is_multimodal_model("llama3.2-vision:90b"));
+        assert!(is_multimodal_model("llama-vision:13b"));
+    }
+
+    #[test]
+    fn test_multimodal_case_insensitive() {
+        assert!(is_multimodal_model("LLAVA"));
+        assert!(is_multimodal_model("LLaVA:7b"));
+        assert!(is_multimodal_model("Moondream2"));
+    }
+
+    #[test]
+    fn test_text_only_models_not_multimodal() {
+        assert!(!is_multimodal_model("mistral"));
+        assert!(!is_multimodal_model("codestral:latest"));
+        assert!(!is_multimodal_model("llama3:8b"));
+        assert!(!is_multimodal_model("phi3:14b"));
+        assert!(!is_multimodal_model("gemma:7b"));
+        assert!(!is_multimodal_model("qwen2:7b"));
+        assert!(!is_multimodal_model("deepseek-coder:6.7b"));
+    }
+
+    #[test]
+    fn test_empty_string_not_multimodal() {
+        assert!(!is_multimodal_model(""));
+    }
+}

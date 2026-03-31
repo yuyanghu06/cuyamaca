@@ -371,7 +371,6 @@ fn extract_arduino_cli(
 }
 
 fn extract_tar_gz(path: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
-    use std::io::Read;
     let file =
         std::fs::File::open(path).map_err(|e| format!("Failed to open archive: {}", e))?;
     let gz = flate2::read::GzDecoder::new(file);

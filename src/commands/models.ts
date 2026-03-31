@@ -42,10 +42,15 @@ export async function getSlotConfig(
   return invoke<SlotConfig | null>("get_slot_config", { slot });
 }
 
+export interface ModelTestResult {
+  ok: boolean;
+  message: string;
+}
+
 export async function checkModelHealth(
   slot: "code" | "runtime",
-): Promise<boolean> {
-  return invoke<boolean>("check_model_health", { slot });
+): Promise<ModelTestResult> {
+  return invoke<ModelTestResult>("check_model_health", { slot });
 }
 
 export async function checkOllamaHealth(): Promise<boolean> {

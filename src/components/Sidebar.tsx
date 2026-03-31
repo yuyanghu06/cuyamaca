@@ -75,15 +75,15 @@ export default function Sidebar({
     }
 
     try {
-      const codeOk = await checkModelHealth("code");
-      setCodeModelStatus(codeOk ? "green" : "red");
+      const codeResult = await checkModelHealth("code");
+      setCodeModelStatus(codeResult.ok ? "green" : "red");
     } catch {
       setCodeModelStatus("red");
     }
 
     try {
-      const runtimeOk = await checkModelHealth("runtime");
-      setRuntimeModelStatus(runtimeOk ? "green" : "red");
+      const runtimeResult = await checkModelHealth("runtime");
+      setRuntimeModelStatus(runtimeResult.ok ? "green" : "red");
     } catch {
       setRuntimeModelStatus("red");
     }

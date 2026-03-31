@@ -1,7 +1,7 @@
 use crate::services::keystore;
 use crate::services::model_manager::{ProviderType, SlotConfig};
 use crate::services::ollama::OllamaProvider;
-use crate::services::provider::ModelProvider;
+use crate::services::provider::{ChatMessage, CompletionRequest, MessageContent, ModelProvider};
 use crate::AppState;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -121,20 +121,61 @@ pub async fn get_slot_config(
     }))
 }
 
+#[derive(Debug, Serialize)]
+pub struct ModelTestResult {
+    pub ok: bool,
+    pub message: String,
+}
+
 #[tauri::command]
 pub async fn check_model_health(
     state: tauri::State<'_, AppState>,
     slot: String,
-) -> Result<bool, String> {
+) -> Result<ModelTestResult, String> {
     let provider = match slot.as_str() {
         "code" => state.model_manager.code_model().await,
         "runtime" => state.model_manager.runtime_model().await,
         _ => return Err(format!("Invalid slot: {}", slot)),
     };
 
-    match provider {
-        Ok(p) => Ok(p.is_healthy().await),
-        Err(_) => Ok(false),
+    let provider = match provider {
+        Ok(p) => p,
+        Err(e) => return Ok(ModelTestResult { ok: false, message: format!("Not configured: {}", e) }),
+    };
+
+    // First do a quick health check
+    if !provider.is_healthy().await {
+        return Ok(ModelTestResult {
+            ok: false,
+            message: "Cannot reach model endpoint. Make sure Ollama is running.".to_string(),
+        });
+    }
+
+    // Send a minimal test completion to verify the model actually responds
+    let request = CompletionRequest {
+        messages: vec![ChatMessage {
+            role: "user".to_string(),
+            content: MessageContent::Text("Reply with only the word: OK".to_string()),
+        }],
+        system_prompt: Some("You are a test assistant. Follow instructions exactly.".to_string()),
+        temperature: Some(0.0),
+        max_tokens: Some(8),
+        tools: None,
+    };
+
+    match provider.complete(request).await {
+        Ok(resp) if !resp.content.is_empty() => Ok(ModelTestResult {
+            ok: true,
+            message: format!("Success! Model responded: \"{}\"", resp.content.trim()),
+        }),
+        Ok(_) => Ok(ModelTestResult {
+            ok: false,
+            message: "Model returned an empty response.".to_string(),
+        }),
+        Err(e) => Ok(ModelTestResult {
+            ok: false,
+            message: format!("Failure: {}", e),
+        }),
     }
 }
 

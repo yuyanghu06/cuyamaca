@@ -11,6 +11,7 @@ import {
   hasApiKey,
   pullOllamaModel,
   deleteOllamaModel,
+  type ModelTestResult,
 } from "../commands/models";
 import { detectArduinoCli } from "../commands/flash";
 import { restartOllama } from "../commands/setup";
@@ -85,14 +86,27 @@ const OLLAMA_CATALOG: OllamaCatalogEntry[] = [
 type HealthStatus = "green" | "amber" | "red";
 
 export default function SettingsView() {
+  const [installedOllamaModels, setInstalledOllamaModels] = useState<ModelInfo[]>([]);
+
+  const refreshInstalledModels = useCallback(async () => {
+    try {
+      const list = await listOllamaModels();
+      setInstalledOllamaModels(list);
+    } catch {
+      setInstalledOllamaModels([]);
+    }
+  }, []);
+
+  useEffect(() => { refreshInstalledModels(); }, [refreshInstalledModels]);
+
   return (
     <div className="settings-view">
       <div className="settings-header">
         <h2 className="settings-title">Settings</h2>
       </div>
       <div className="settings-scroll">
-        <ModelsSection />
-        <OllamaModelsSection />
+        <ModelsSection installedOllamaModels={installedOllamaModels} />
+        <OllamaModelsSection onPullComplete={refreshInstalledModels} />
         <ConnectionsSection />
         <AboutSection />
       </div>
@@ -102,7 +116,7 @@ export default function SettingsView() {
 
 /* ─── Models Section ─── */
 
-function ModelsSection() {
+function ModelsSection({ installedOllamaModels }: { installedOllamaModels: ModelInfo[] }) {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
 
   useEffect(() => {
@@ -117,12 +131,14 @@ function ModelsSection() {
         label="Code Model"
         providers={providers}
         multimodalOnly={false}
+        installedOllamaModels={installedOllamaModels}
       />
       <ModelSlot
         slot="runtime"
         label="Runtime Model"
         providers={providers}
         multimodalOnly={true}
+        installedOllamaModels={installedOllamaModels}
       />
     </section>
   );
@@ -133,12 +149,12 @@ interface ModelSlotProps {
   label: string;
   providers: ProviderInfo[];
   multimodalOnly: boolean;
+  installedOllamaModels: ModelInfo[];
 }
 
-function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
+function ModelSlot({ slot, label, providers, multimodalOnly, installedOllamaModels }: ModelSlotProps) {
   const [provider, setProvider] = useState("ollama");
   const [model, setModel] = useState("");
-  const [installedOllamaModels, setInstalledOllamaModels] = useState<ModelInfo[]>([]);
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState(false);
   const [health, setHealth] = useState<HealthStatus>("red");
@@ -146,6 +162,7 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
   const [saving, setSaving] = useState(false);
   const [multimodalWarning, setMultimodalWarning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<ModelTestResult | null>(null);
 
   // Load current config
   useEffect(() => {
@@ -157,15 +174,8 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
       }
     }).catch(() => {});
 
-    checkModelHealth(slot).then((ok) => setHealth(ok ? "green" : "red")).catch(() => {});
+    checkModelHealth(slot).then((result) => setHealth(result.ok ? "green" : "red")).catch(() => {});
   }, [slot]);
-
-  // Load installed Ollama models when provider is ollama
-  useEffect(() => {
-    if (provider === "ollama") {
-      listOllamaModels().then(setInstalledOllamaModels).catch(() => setInstalledOllamaModels([]));
-    }
-  }, [provider]);
 
   // Check if we have an API key for this provider
   useEffect(() => {
@@ -214,9 +224,9 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
       );
       setMultimodalWarning(result.multimodal_warning);
       // Test health after save
-      const ok = await checkModelHealth(slot);
-      setHealth(ok ? "green" : "red");
-      if (!ok && provider === "ollama" && !installedIds.has(model)) {
+      const healthResult = await checkModelHealth(slot);
+      setHealth(healthResult.ok ? "green" : "red");
+      if (!healthResult.ok && provider === "ollama" && !installedIds.has(model)) {
         setError(`"${model}" is not installed. Pull it in the Ollama Models section below, then test again.`);
       }
       if (apiKey) {
@@ -234,16 +244,17 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
   const handleTest = useCallback(async () => {
     setTesting(true);
     setError(null);
+    setTestResult(null);
     try {
-      const ok = await checkModelHealth(slot);
-      setHealth(ok ? "green" : "red");
-      if (!ok && provider === "ollama" && !installedIds.has(model)) {
+      const result = await checkModelHealth(slot);
+      setTestResult(result);
+      setHealth(result.ok ? "green" : "red");
+      if (!result.ok && provider === "ollama" && !installedIds.has(model)) {
         setError(`"${model}" is not installed. Pull it in the Ollama Models section below first.`);
-      } else if (!ok) {
-        setError("Model unreachable. Check that Ollama is running and the model name is correct.");
       }
-    } catch {
+    } catch (err) {
       setHealth("red");
+      setTestResult({ ok: false, message: String(err) });
     } finally {
       setTesting(false);
     }
@@ -364,18 +375,23 @@ function ModelSlot({ slot, label, providers, multimodalOnly }: ModelSlotProps) {
           className="settings-btn"
           onClick={handleTest}
           disabled={testing || !model}
-          title={!model ? "Select a model first" : "Check if model is reachable"}
+          title={!model ? "Select a model first" : "Send a test completion to verify the model works"}
         >
           {testing ? "Testing…" : "Test"}
         </button>
       </div>
+      {testResult && (
+        <div className={`model-test-result ${testResult.ok ? "model-test-ok" : "model-test-fail"}`}>
+          {testResult.message}
+        </div>
+      )}
     </GlassPanel>
   );
 }
 
 /* ─── Ollama Models Section ─── */
 
-function OllamaModelsSection() {
+function OllamaModelsSection({ onPullComplete }: { onPullComplete: () => void }) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [pullName, setPullName] = useState("");
   const [pulling, setPulling] = useState(false);
@@ -427,6 +443,7 @@ function OllamaModelsSection() {
             setPulling(false);
             setPullName("");
             refreshModels();
+            onPullComplete();
             break;
           case "failed":
             setPullError(event.data.error);
@@ -439,17 +456,18 @@ function OllamaModelsSection() {
     } finally {
       setPulling(false);
     }
-  }, [pullName, pulling, refreshModels]);
+  }, [pullName, pulling, refreshModels, onPullComplete]);
 
   const handleDelete = useCallback(async (name: string) => {
     if (!confirm(`Delete model "${name}"?`)) return;
     try {
       await deleteOllamaModel(name);
       refreshModels();
+      onPullComplete();
     } catch (err) {
       console.error("Delete failed:", err);
     }
-  }, [refreshModels]);
+  }, [refreshModels, onPullComplete]);
 
   return (
     <section className="settings-section">

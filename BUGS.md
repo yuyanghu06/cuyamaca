@@ -1,16 +1,10 @@
-No ability to delete projects, not transparent enough on where projects are being saved
-    Include view in finder directory, include delete button for projects (ask to confirm too before deleting)
+Using chat logic still seems to generate code, create a prompts folder and have the backend load directly from it for both the coding and runtime models
 
-Cancel button doesn't work when adding components
+Code editor should allow the user to manually edit the code generated as well. Generated code snippets should be zoomable (zoom in and out)
 
-Pulling ollama models should show download bar to represent pull progress. No existing UI to show that
+Test button in settings should not only test ollama's connection, but also test to make sure the model selected is usable. 
+    If successful, have the test button return "success!"
+    If unsuccessful, have the test button return "failure!" with a corresponding error
 
-Generate from manifest button doesn't work properly
-    Write a test case and tell me how to run it so I can double check to make sure it's properly generating runnable Arduino code
-
-Ollama chat display should automatically display text as it pops up.
-
-Save and test buttons don't work properly when changing models
-
-Generally, buttons are glitchy and flicker around a lot. 
+Completion of model pulling should automatically refresh the installed model list on both runtime and code model selectors.
 

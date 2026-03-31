@@ -4,6 +4,54 @@ use crate::models::tools::{
 };
 use crate::services::provider::{ChatMessage, CompletionRequest, MessageContent, ModelProvider};
 use similar::{ChangeTag, TextDiff};
+use std::sync::OnceLock;
+
+// Prompt templates loaded from src-tauri/prompts/ at startup
+static GENERATE_PROMPT: OnceLock<String> = OnceLock::new();
+static CHAT_PROMPT: OnceLock<String> = OnceLock::new();
+static REVIEW_PROMPT: OnceLock<String> = OnceLock::new();
+static RUNTIME_PROMPT: OnceLock<String> = OnceLock::new();
+
+fn load_prompt(name: &str) -> String {
+    // Try loading from the prompts directory adjacent to the binary
+    let candidates = [
+        // Running from src-tauri/target/debug or release
+        format!("../../prompts/{}.md", name),
+        format!("../prompts/{}.md", name),
+        format!("prompts/{}.md", name),
+        // Absolute from working dir
+        format!("{}/prompts/{}.md", env!("CARGO_MANIFEST_DIR"), name),
+    ];
+    for path in &candidates {
+        if let Ok(text) = std::fs::read_to_string(path) {
+            return text;
+        }
+    }
+    // Fallback: embedded at compile time
+    match name {
+        "generate" => include_str!("../../prompts/generate.md").to_string(),
+        "chat" => include_str!("../../prompts/chat.md").to_string(),
+        "review" => include_str!("../../prompts/review.md").to_string(),
+        "runtime" => include_str!("../../prompts/runtime.md").to_string(),
+        _ => String::new(),
+    }
+}
+
+pub fn get_generate_prompt() -> &'static str {
+    GENERATE_PROMPT.get_or_init(|| load_prompt("generate"))
+}
+
+pub fn get_chat_prompt() -> &'static str {
+    CHAT_PROMPT.get_or_init(|| load_prompt("chat"))
+}
+
+pub fn get_review_prompt() -> &'static str {
+    REVIEW_PROMPT.get_or_init(|| load_prompt("review"))
+}
+
+pub fn get_runtime_prompt() -> &'static str {
+    RUNTIME_PROMPT.get_or_init(|| load_prompt("runtime"))
+}
 
 pub struct CodeGenService;
 
@@ -165,31 +213,11 @@ Respond with ONLY the JSON array, no explanation."#,
 fn build_system_prompt(manifest: &Manifest) -> String {
     let manifest_json = serde_json::to_string_pretty(manifest).unwrap_or_default();
     let pin_summary = build_pin_summary(manifest);
-
-    format!(
-        r#"You are an Arduino code generator. You produce complete, compilable .ino sketches.
-
-Rules you must follow:
-1. Always include Serial.begin({baud}) in setup().
-2. Always include a command dispatch loop in loop() that reads Serial.readStringUntil('\n'), parses the CMD: prefix, and dispatches to handler functions.
-3. All Serial.print output must follow the structured format: SENSOR_ID:VALUE
-4. Print sensor state at fixed intervals using millis(), not delay(). Default interval: 100ms.
-5. Always include an emergency stop command (CMD:stop) that halts all actuators immediately.
-6. Pin assignments must use #define or const int declarations matching the manifest exactly.
-7. Do not include freeform debug strings. All serial output is structured.
-8. Return ONLY the complete sketch wrapped in a ```cpp code fence.
-
-The hardware manifest:
-```json
-{manifest}
-```
-
-Component pin reference:
-{pins}"#,
-        baud = manifest.baud_rate,
-        manifest = manifest_json,
-        pins = pin_summary,
-    )
+    let template = get_generate_prompt();
+    template
+        .replace("{baud}", &manifest.baud_rate.to_string())
+        .replace("{manifest}", &manifest_json)
+        .replace("{pins}", &pin_summary)
 }
 
 fn build_chat_system_prompt(manifest: &Manifest, current_sketch: Option<&str>) -> String {
@@ -197,15 +225,21 @@ fn build_chat_system_prompt(manifest: &Manifest, current_sketch: Option<&str>) -
 }
 
 pub fn build_chat_system_prompt_pub(manifest: &Manifest, current_sketch: Option<&str>) -> String {
-    let base = build_system_prompt(manifest);
+    let manifest_json = serde_json::to_string_pretty(manifest).unwrap_or_default();
+    let pin_summary = build_pin_summary(manifest);
     let sketch_section = match current_sketch {
         Some(sketch) => format!(
-            "\n\nThe current sketch:\n```cpp\n{}\n```\n\nWhen the user asks you to modify the sketch, return the COMPLETE modified sketch in a ```cpp code fence. You may also include explanation text outside the code fence. Do not omit any existing functionality unless explicitly asked to remove it.",
+            "The current sketch:\n```cpp\n{}\n```\n\nWhen the user asks you to modify the sketch, return the COMPLETE modified sketch in a ```cpp code fence. You may also include explanation text outside the code fence. Do not omit any existing functionality unless explicitly asked to remove it.",
             sketch
         ),
-        None => "\n\nNo sketch exists yet. If the user asks you to generate one, return the complete sketch in a ```cpp code fence.".to_string(),
+        None => "No sketch exists yet. If the user asks you to generate one, return the complete sketch in a ```cpp code fence.".to_string(),
     };
-    format!("{}{}", base, sketch_section)
+    let template = get_chat_prompt();
+    template
+        .replace("{baud}", &manifest.baud_rate.to_string())
+        .replace("{manifest}", &manifest_json)
+        .replace("{pins}", &pin_summary)
+        .replace("{sketch_section}", &sketch_section)
 }
 
 fn build_pin_summary(manifest: &Manifest) -> String {

@@ -137,6 +137,9 @@ export default function CodeView({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flashStatus, setFlashStatus] = useState<FlashStatus>({ state: "idle" });
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedCode, setEditedCode] = useState<string | null>(null);
+  const [fontSize, setFontSize] = useState(13);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerate = useCallback(async () => {
@@ -293,9 +296,41 @@ export default function CodeView({
   const hasSketch = !!currentSketch;
   const hasPending = !!pendingSketch;
 
-  // Determine what to display
-  const displayCode = hasPending ? pendingSketch.code : currentSketch;
-  const diffLines = hasPending ? pendingSketch.diff : null;
+  // Determine what to display — editing overrides
+  const baseCode = hasPending ? pendingSketch.code : currentSketch;
+  const displayCode = isEditing && editedCode !== null ? editedCode : baseCode;
+  const diffLines = hasPending && !isEditing ? pendingSketch.diff : null;
+
+  const handleZoomIn = () => setFontSize((s) => Math.min(s + 1, 22));
+  const handleZoomOut = () => setFontSize((s) => Math.max(s - 1, 9));
+  const handleZoomReset = () => setFontSize(13);
+
+  const handleStartEdit = () => {
+    setEditedCode(baseCode || "");
+    setIsEditing(true);
+    setError(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (editedCode === null) return;
+    setLoading(true);
+    try {
+      await approveSketch(editedCode);
+      onProjectUpdated();
+      onPendingSketch(null);
+      setIsEditing(false);
+      setEditedCode(null);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedCode(null);
+  };
 
   // Empty state
   if (!hasSketch && !hasPending) {
@@ -467,9 +502,43 @@ export default function CodeView({
       {/* Code display */}
       <div className="code-scroll">
         <GlassPanel tier="subtle" className="code-block">
-          {diffLines
-            ? renderDiffView(diffLines)
-            : renderPlainView(displayCode || "")}
+          {/* Zoom + Edit toolbar */}
+          <div className="code-block-toolbar">
+            <div className="code-zoom-controls">
+              <button className="code-zoom-btn" onClick={handleZoomOut} title="Zoom out (−)">−</button>
+              <button className="code-zoom-btn code-zoom-reset" onClick={handleZoomReset} title="Reset zoom">{fontSize}px</button>
+              <button className="code-zoom-btn" onClick={handleZoomIn} title="Zoom in (+)">+</button>
+            </div>
+            {!hasPending && !isEditing && (
+              <button className="code-edit-btn" onClick={handleStartEdit}>
+                ✎ Edit
+              </button>
+            )}
+            {isEditing && (
+              <div className="code-edit-actions">
+                <button className="code-edit-save-btn" onClick={handleSaveEdit} disabled={loading}>
+                  {loading ? "Saving…" : "Save"}
+                </button>
+                <button className="code-edit-cancel-btn" onClick={handleCancelEdit}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+
+          {isEditing ? (
+            <textarea
+              className="code-editor-textarea"
+              style={{ fontSize }}
+              value={editedCode ?? ""}
+              onChange={(e) => setEditedCode(e.target.value)}
+              spellCheck={false}
+            />
+          ) : diffLines ? (
+            renderDiffView(diffLines, fontSize)
+          ) : (
+            renderPlainView(displayCode || "", fontSize)
+          )}
         </GlassPanel>
       </div>
 
@@ -511,10 +580,10 @@ export default function CodeView({
   );
 }
 
-function renderPlainView(code: string) {
+function renderPlainView(code: string, fontSize = 13) {
   const lines = code.split("\n");
   return (
-    <pre className="code-lines">
+    <pre className="code-lines" style={{ fontSize }}>
       {lines.map((line, idx) => (
         <div key={idx} className="code-line">
           <span className="code-line-num">{idx + 1}</span>
@@ -525,9 +594,9 @@ function renderPlainView(code: string) {
   );
 }
 
-function renderDiffView(diff: DiffLine[]) {
+function renderDiffView(diff: DiffLine[], fontSize = 13) {
   return (
-    <pre className="code-lines">
+    <pre className="code-lines" style={{ fontSize }}>
       {diff.map((line, idx) => {
         const statusClass =
           line.status === "added"

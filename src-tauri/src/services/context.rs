@@ -78,40 +78,17 @@ pub fn assemble(
 }
 
 fn build_system_prompt(manifest: &Manifest, tools: &[SerialToolDefinition]) -> String {
-    let mut prompt = String::from(
-        "You are controlling a robot through serial commands. \
-         You observe sensor data and camera images, decide what actions to take, \
-         and call the available tools to control the hardware.\n\n",
-    );
+    let manifest_json = serde_json::to_string_pretty(manifest).unwrap_or_default();
 
-    // Manifest summary
-    prompt.push_str(&format!("Hardware: {} on {}\n", manifest.project, manifest.board));
-    if !manifest.components.is_empty() {
-        prompt.push_str("Components:\n");
-        for c in &manifest.components {
-            prompt.push_str(&format!("- {} ({}) — {}\n", c.id, c.component_type, c.label));
-        }
-    }
+    let tools_str: String = tools
+        .iter()
+        .map(|t| format!("- {}: {}", t.name, t.description))
+        .collect::<Vec<_>>()
+        .join("\n");
 
-    prompt.push_str("\nAvailable tools:\n");
-    for t in tools {
-        prompt.push_str(&format!("- {}: {}\n", t.name, t.description));
-    }
-    prompt.push_str("- read_sensor_state: Get a fresh sensor state reading\n");
-    prompt.push_str("- wait_milliseconds: Pause for a given number of milliseconds\n");
-    prompt.push_str("- end_session: End the runtime session\n");
-
-    prompt.push_str(
-        "\nRules:\n\
-         - Always check sensor data before and after actions\n\
-         - If any sensor indicates danger (obstacle too close, tilt too steep), call stop immediately\n\
-         - Explain what you observe and why you're taking each action\n\
-         - If you're unsure about a sensor reading, call read_sensor_state for a fresh reading\n\
-         - Never move without checking distance sensors first\n\
-         - You can call multiple tools in sequence within a single turn\n",
-    );
-
-    prompt
+    crate::services::code_gen::get_runtime_prompt()
+        .replace("{manifest}", &manifest_json)
+        .replace("{tools}", &tools_str)
 }
 
 fn build_tool_definitions(tools: &[SerialToolDefinition]) -> Vec<ToolDefinition> {

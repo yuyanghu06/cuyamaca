@@ -170,7 +170,7 @@ pub async fn upload_sketch(
     // Try to have the code model verify and potentially modify the uploaded sketch
     match state.model_manager.code_model().await {
         Ok(provider) => {
-            let system_prompt = "You are an Arduino code reviewer. Check if this sketch follows the structured serial output convention (SENSOR_ID:VALUE format) and has a CMD: dispatch loop. If it does, respond with just: SKETCH_OK. If it needs modifications, return the complete modified sketch in a ```cpp code fence with a brief explanation of what you changed.".to_string();
+            let system_prompt = crate::services::code_gen::get_review_prompt().to_string();
 
             let user_prompt = format!(
                 "Review this sketch for a project with this manifest:\n```json\n{}\n```\n\nSketch:\n```cpp\n{}\n```",

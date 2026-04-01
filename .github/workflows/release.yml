@@ -10,16 +10,7 @@ permissions:
 
 jobs:
   build-macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runner: macos-latest
-          - target: x86_64-apple-darwin
-            runner: macos-13
-
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +44,7 @@ jobs:
             ## Cuyamaca ${{ github.ref_name }}
 
             ### Installation
-            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon) or `Cuyamaca_${{ github.ref_name }}_x64.dmg` (Intel)
+            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon)
             - **Windows:** Download `Cuyamaca_${{ github.ref_name }}_x64-setup.exe`
 
             ### First Launch
@@ -63,7 +54,7 @@ jobs:
             See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --target aarch64-apple-darwin
 
   build-windows:
     runs-on: windows-latest
@@ -98,7 +89,7 @@ jobs:
             ## Cuyamaca ${{ github.ref_name }}
 
             ### Installation
-            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon) or `Cuyamaca_${{ github.ref_name }}_x64.dmg` (Intel)
+            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon)
             - **Windows:** Download `Cuyamaca_${{ github.ref_name }}_x64-setup.exe`
 
             ### First Launch

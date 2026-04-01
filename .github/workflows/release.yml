@@ -9,46 +9,15 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Cuyamaca ${{ github.ref_name }}
-          draft: true
-          prerelease: false
-          body: |
-            ## Cuyamaca ${{ github.ref_name }}
-
-            ### Installation
-            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon) or `Cuyamaca_${{ github.ref_name }}_x64.dmg` (Intel)
-            - **Windows:** Download `Cuyamaca_${{ github.ref_name }}_x64-setup.exe`
-
-            ### First Launch
-            Cuyamaca will automatically detect and offer to install Ollama and arduino-cli if they are not present.
-
-            ### What's Changed
-            See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
-
   build-macos:
-    needs: create-release
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: aarch64-apple-darwin
             runner: macos-latest
-            label: aarch64
           - target: x86_64-apple-darwin
             runner: macos-13
-            label: x64
 
     runs-on: ${{ matrix.runner }}
     steps:
@@ -73,16 +42,30 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
-      - name: Build Tauri app
+      - name: Build and upload
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ github.ref_name }}
+          releaseName: Cuyamaca ${{ github.ref_name }}
+          releaseBody: |
+            ## Cuyamaca ${{ github.ref_name }}
+
+            ### Installation
+            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon) or `Cuyamaca_${{ github.ref_name }}_x64.dmg` (Intel)
+            - **Windows:** Download `Cuyamaca_${{ github.ref_name }}_x64-setup.exe`
+
+            ### First Launch
+            Cuyamaca will automatically detect and offer to install Ollama and arduino-cli if they are not present.
+
+            ### What's Changed
+            See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+          releaseDraft: true
+          prerelease: false
           args: --target ${{ matrix.target }}
 
   build-windows:
-    needs: create-release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,15 +87,30 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
-      - name: Build Tauri app
+      - name: Build and upload
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ github.ref_name }}
+          releaseName: Cuyamaca ${{ github.ref_name }}
+          releaseBody: |
+            ## Cuyamaca ${{ github.ref_name }}
+
+            ### Installation
+            - **macOS:** Download `Cuyamaca_${{ github.ref_name }}_aarch64.dmg` (Apple Silicon) or `Cuyamaca_${{ github.ref_name }}_x64.dmg` (Intel)
+            - **Windows:** Download `Cuyamaca_${{ github.ref_name }}_x64-setup.exe`
+
+            ### First Launch
+            Cuyamaca will automatically detect and offer to install Ollama and arduino-cli if they are not present.
+
+            ### What's Changed
+            See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
+          releaseDraft: true
+          prerelease: false
 
   publish-release:
-    needs: [create-release, build-macos, build-windows]
+    needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Publish release (undraft)
@@ -120,9 +118,16 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            await github.rest.repos.updateRelease({
+            const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: ${{ needs.create-release.outputs.release_id }},
-              draft: false
             });
+            const release = releases.data.find(r => r.tag_name === context.ref.replace('refs/tags/', ''));
+            if (release) {
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+                draft: false,
+              });
+            }
